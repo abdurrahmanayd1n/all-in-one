@@ -10,7 +10,23 @@ using Windows.UI.Notifications;
 
 static class Toast
 {
-    const string AppId = "AllInOne.App"; // registered by kur.ps1
+    const string AppId = "AllInOne.App";
+    public const string Identity = @"HKEY_CURRENT_USER\Software\Classes\AppUserModelId\" + AppId;
+
+    // Name and icon under which Windows shows the notifications. The app writes them itself, so a downloaded
+    // exe works without kur.ps1.
+    public static void Register(string key, string folder)
+    {
+        string icon = Path.Combine(folder, "app.ico");
+        if (!File.Exists(icon))
+        {
+            Directory.CreateDirectory(folder);
+            using (var from = Assets.Open("app.ico"))
+            using (var to = File.Create(icon)) from.CopyTo(to);
+        }
+        Microsoft.Win32.Registry.SetValue(key, "DisplayName", "All In One");
+        Microsoft.Win32.Registry.SetValue(key, "IconUri", icon);
+    }
 
     // Click events reach only notification objects that are still alive.
     static readonly Queue<ToastNotification> recent = new Queue<ToastNotification>();

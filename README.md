@@ -4,9 +4,19 @@ Windows için İsviçre çakısı: Dosya Gezgini'nde ya da masaüstünde dosya s
 
 *A radial menu for files selected in Explorer (hold Left Alt), plus a screen colour picker and small Windows tools. The interface is in Turkish.*
 
-## Kurulum
+## İndir ve çalıştır
 
-Gereken: Windows 11 (64 bit). Ayrıca bir şey kurman gerekmez; uygulama, Windows ile gelen C# derleyicisiyle senin bilgisayarında derlenir.
+1. **[AllInOne.exe dosyasını indir](https://github.com/abdurrahmanayd1n/all-in-one/releases/latest/download/AllInOne.exe)** (tüm sürümler: [Releases](https://github.com/abdurrahmanayd1n/all-in-one/releases)).
+2. Kalıcı duracağı bir klasöre koy ve çift tıkla. Saatin yanında simgesi görünür.
+3. Windows ile birlikte açılsın istersen: simgeye çift tıkla → **Ayarlar** → otomatik başlatmayı işaretle.
+
+Gereken: Windows 11 (64 bit); ayrıca bir şey kurman gerekmez. Dosya imzalı olmadığı için Windows ilk açılışta "bilinmeyen yayıncı" uyarısı gösterebilir (**Ek bilgi → Yine de çalıştır**). Güvenmiyorsan aşağıdaki yolla kaynaktan derleyebilirsin.
+
+Kaldırmak için: Ayarlar'da otomatik başlatmayı kapat, simgeden **Çıkış** de, dosyayı sil.
+
+## Kaynaktan kurulum
+
+Uygulama, Windows ile gelen C# derleyicisiyle senin bilgisayarında derlenir.
 
 1. Bu sayfada **Code → Download ZIP** ile indir ve klasöre çıkar (ya da `git clone`).
 2. `kur.cmd` dosyasına çift tıkla.

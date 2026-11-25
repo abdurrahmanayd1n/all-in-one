@@ -532,6 +532,8 @@ static class Program
             {
                 Log.Watch();
                 Log.Info("Uygulama başladı.");
+                try { Toast.Register(Toast.Identity, Log.Folder); }
+                catch (Exception e) { Log.Error("bildirim kimliği yazılamadı", e); } // everything else still works
                 Application.Run(new App());
                 Log.Info("Uygulama kapatıldı.");
             }
@@ -895,6 +897,17 @@ static class Program
                 && toast.SelectNodes("//action").Count == 1;
             toast.LoadXml(Toast.Xml(new Outcome { Text = "bilgi" }));
             ok &= toast.SelectNodes("//action").Count == 0;
+
+            // A downloaded exe registers its own notification name and icon.
+            string idKey = @"Software\AllInOne-test-" + Guid.NewGuid().ToString("N"), idFolder = Path.Combine(dir, "kimlik");
+            try
+            {
+                Toast.Register(@"HKEY_CURRENT_USER\" + idKey, idFolder);
+                var icon = Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\" + idKey, "IconUri", null) as string;
+                ok &= icon == Path.Combine(idFolder, "app.ico") && new FileInfo(icon).Length > 0
+                    && "All In One".Equals(Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\" + idKey, "DisplayName", null));
+            }
+            finally { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(idKey, false); }
 
             // A transparent image is not flattened without consent.
             string clear = Path.Combine(dir, "b.png");

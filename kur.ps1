@@ -1,5 +1,6 @@
 # Build, install, enable autostart and run. Remove with: .\kur.ps1 -Kaldir
-param([switch]$Kaldir)
+# -Derle: only build bin\AllInOne.exe and test it, for publishing.
+param([switch]$Kaldir, [switch]$Derle)
 $ErrorActionPreference = 'Stop'
 
 $dir = Join-Path $env:LOCALAPPDATA 'AllInOne'
@@ -23,7 +24,7 @@ if ($Kaldir) {
 $fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
 $built = Join-Path $PSScriptRoot 'bin\AllInOne.exe'
 $meta = Join-Path $env:WINDIR 'System32\WinMetadata'
-New-Item -ItemType Directory -Force (Split-Path $built), $dir | Out-Null
+New-Item -ItemType Directory -Force (Split-Path $built) | Out-Null
 & "$fw\csc.exe" /nologo /codepage:65001 /target:winexe /optimize+ /warnaserror+ "/out:$built" "/lib:$fw\WPF" `
     /r:WindowsBase.dll /r:Microsoft.CSharp.dll /r:System.IO.Compression.dll `
     /r:PresentationCore.dll /r:PresentationFramework.dll /r:System.Xaml.dll /r:WindowsFormsIntegration.dll `
@@ -36,6 +37,8 @@ New-Item -ItemType Directory -Force (Split-Path $built), $dir | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Derleme basarisiz.' }
 
 if ((Start-Process $built '--test' -Wait -PassThru).ExitCode -ne 0) { throw 'Self-test basarisiz.' }
+if ($Derle) { "Hazir: $built"; return }
+New-Item -ItemType Directory -Force $dir | Out-Null
 
 if ($old) { $old | Stop-Process -Force; $old | Wait-Process }
 # Windows can hold the old exe for a moment after the process has ended.
