@@ -1,0 +1,22 @@
+# Pushing a tag such as v1.0 builds the app from that source, runs its self-test and publishes the exe as a release.
+name: Surum
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  surum:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Derle ve sina
+        shell: powershell
+        run: .\kur.ps1 -Derle
+      - name: Surumu yayimla
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME bin\AllInOne.exe --verify-tag --title "All In One $($env:GITHUB_REF_NAME.TrimStart('v'))" --notes-file .github\surum-notu.md
+          exit $LASTEXITCODE
