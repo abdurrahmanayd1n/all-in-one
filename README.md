@@ -10,7 +10,7 @@ Windows için İsviçre çakısı: Dosya Gezgini'nde ya da masaüstünde dosya s
 2. Kalıcı duracağı bir klasöre koy ve çift tıkla. Saatin yanında simgesi görünür.
 3. Windows ile birlikte açılsın istersen: simgeye çift tıkla → **Ayarlar** → otomatik başlatmayı işaretle.
 
-Gereken: Windows 11 (64 bit); ayrıca bir şey kurman gerekmez.
+Gereken: Windows 11 ya da Windows 10 (22H2), 64 bit; ayrıca bir şey kurman gerekmez. Windows 10'da bildirimler saatin yanındaki simgeden gelir. Windows 10 desteği, ona en yakın sunucu sürümünde (Windows Server 2022) otomatik olarak derlenip sınanır; masaüstü Windows 10'da henüz elle denenmedi.
 
 **Sürümler henüz imzalı değil** (bkz. [Code signing policy](#code-signing-policy)). Bu yüzden:
 
