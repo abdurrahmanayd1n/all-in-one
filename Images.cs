@@ -283,10 +283,29 @@ static class Images
         }
     }
 
+    // The EXIF orientation. Asking by the photo property's name fails on some editions of Windows (the whole
+    // load did), so the tag itself is asked next, where JPEG and where TIFF keep it.
+    static int Orientation(BitmapMetadata metadata)
+    {
+        if (metadata == null) return 1;
+        foreach (var query in new[] { "System.Photo.Orientation", "/app1/ifd/{ushort=274}", "/ifd/{ushort=274}" })
+        {
+            try
+            {
+                object value = metadata.GetQuery(query);
+                if (value != null) return Convert.ToInt32(value);
+            }
+            catch (NotSupportedException) { }
+            catch (ArgumentException) { } // a place this kind of file does not have
+            catch (InvalidOperationException) { }
+            catch (System.Runtime.InteropServices.COMException) { }
+        }
+        return 1;
+    }
+
     static BitmapSource Upright(BitmapSource source, BitmapMetadata metadata)
     {
-        object value = metadata == null ? null : metadata.GetQuery("System.Photo.Orientation");
-        int o = value == null ? 1 : Convert.ToInt32(value);
+        int o = Orientation(metadata);
         if (o < 2 || o > 8) return source;
         var t = new TransformGroup();
         if (o == 2 || o == 5 || o == 7) t.Children.Add(new ScaleTransform(-1, 1));
