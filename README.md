@@ -10,9 +10,14 @@ Windows için İsviçre çakısı: Dosya Gezgini'nde ya da masaüstünde dosya s
 2. Kalıcı duracağı bir klasöre koy ve çift tıkla. Saatin yanında simgesi görünür.
 3. Windows ile birlikte açılsın istersen: simgeye çift tıkla → **Ayarlar** → otomatik başlatmayı işaretle.
 
-Gereken: Windows 11 (64 bit); ayrıca bir şey kurman gerekmez. Dosya imzalı olmadığı için Windows ilk açılışta "bilinmeyen yayıncı" uyarısı gösterebilir (**Ek bilgi → Yine de çalıştır**). Güvenmiyorsan aşağıdaki yolla kaynaktan derleyebilirsin.
+Gereken: Windows 11 (64 bit); ayrıca bir şey kurman gerekmez.
 
-Kaldırmak için: Ayarlar'da otomatik başlatmayı kapat, simgeden **Çıkış** de, dosyayı sil.
+**Sürümler henüz imzalı değil** (bkz. [Code signing policy](#code-signing-policy)). Bu yüzden:
+
+- Windows ilk açılışta "bilinmeyen yayıncı" uyarısı gösterebilir (**Ek bilgi → Yine de çalıştır**).
+- **Akıllı Uygulama Denetimi** açık bilgisayarlar uygulamayı engeller ve tek bir uygulama için izin verilemez. Kaynaktan derlenen exe de engellenir. İmza gelene kadar bu bilgisayarlarda uygulama çalışmaz.
+
+Kaldırmak için: simgeye çift tıkla → **Ayarlar** → **Uygulamayı kaldır**, sonra açılan klasörde seçili dosyayı sil.
 
 ## Kaynaktan kurulum
 
@@ -64,18 +69,29 @@ Saatin yanındaki ayrı simge:
 
 | Kısayol | İşlev |
 | --- | --- |
-| `Win+Shift+O` | Ekrandan metin al |
+| `Alt+Q` veya `Win+Shift+O` | Ekranda alan seç, içindeki metni kopyala |
+| `Alt+T` | Ekrandaki tabloyu seç, sütunlarıyla kopyala (Excel'e yapıştır) |
 | `Win+Shift+U` | Pencereyi üstte sabitle / bırak |
 | `Win+Shift+Y` | Düz (biçimsiz) yapıştır |
 | `Win+Shift+B` | Büyük/küçük harf çevirip yapıştır |
 
 Menünün açılma süresi, otomatik başlatma ve dosya adlarına eklenecek sabit ek, saatin yanındaki All In One simgesinden **Ayarlar** ile değişir.
 
+## Code signing policy
+
+Releases are **not signed yet**. This project intends to apply to the SignPath Foundation program; once accepted, releases will carry: *Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org)*.
+
+- Committers, reviewers and approvers: [abdurrahmanayd1n](https://github.com/abdurrahmanayd1n)
+- Release binaries are built only from this repository by [GitHub Actions](.github/workflows/surum.yml), from a version tag.
+- Privacy policy: This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. See [Gizlilik](#gizlilik).
+- Optional third-party program: [FFmpeg](https://ffmpeg.org), installed by the user and run locally.
+
 ## Gizlilik
 
-- Uygulama ağ bağlantısı açmaz.
+- Uygulama ağ bağlantısı açmaz; hiçbir bilgi başka bir sisteme gönderilmez.
 - Sol Alt'ı fark edebilmek için bir klavye kancası kullanır; bastığın tuşları kaydetmez. Bazı güvenlik yazılımları klavye kancalarından uyarı verebilir.
 - Ayarlar ve renk geçmişi `HKCU\Software\AllInOne` altında, hata kaydı `%LOCALAPPDATA%\AllInOne\hata.log` dosyasındadır. Hata kaydında dosya yolları geçebilir; birine göndermeden önce bak.
+- Sistemde değiştirdikleri, hepsi yalnız senin kullanıcı hesabında: yukarıdaki iki yer, bildirimlerin adı ve simgesi (`HKCU\Software\Classes\AppUserModelId\AllInOne.App`, `%LOCALAPPDATA%\AllInOne\app.ico`) ve sen açarsan otomatik başlatma kaydı. **Uygulamayı kaldır** hepsini siler.
 
 ## Geliştirme
 

@@ -28,10 +28,24 @@ static class Ocr
     // The lines of text found in the picture; empty when there are none. language null: the user's own.
     public static string Read(Picture picture, Language language)
     {
+        return string.Join(Environment.NewLine, Recognize(picture, language).Lines.Select(line => line.Text));
+    }
+
+    // Every word with its place in the picture enlarged scale times, for putting columns back together.
+    public static Word[] Words(Picture picture, double scale)
+    {
+        return Recognize(picture, null, scale).Lines.SelectMany(line => line.Words).Select(w => new Word { Text = w.Text,
+            X = w.BoundingRect.X, Y = w.BoundingRect.Y, Width = w.BoundingRect.Width, Height = w.BoundingRect.Height })
+            .ToArray();
+    }
+
+    // scale 0: the size that reads text best in general.
+    static OcrResult Recognize(Picture picture, Language language, double scale = 0)
+    {
         var engine = language == null ? OcrEngine.TryCreateFromUserProfileLanguages() : OcrEngine.TryCreateFromLanguage(language);
         if (engine == null)
             throw new NotSupportedException("Windows'ta metin tanıma dili kurulu değil. Ayarlar > Saat ve dil > Dil bölümünden ekle.");
-        var pixels = Prepared(picture);
+        var pixels = Prepared(picture, scale);
         int w = pixels.PixelWidth, h = pixels.PixelHeight;
         var data = new byte[w * h * 4];
         pixels.CopyPixels(data, w * 4, 0);
@@ -42,16 +56,17 @@ static class Ocr
             var work = engine.RecognizeAsync(bitmap);
             while (work.Status == AsyncStatus.Started) System.Threading.Thread.Sleep(10);
             if (work.Status != AsyncStatus.Completed) throw new IOException("Metin okunamadı.", work.ErrorCode);
-            return string.Join(Environment.NewLine, work.GetResults().Lines.Select(line => line.Text));
+            return work.GetResults();
         }
     }
 
     // An opaque picture of a size the engine reads well.
-    static BitmapSource Prepared(Picture picture)
+    static BitmapSource Prepared(Picture picture, double wanted)
     {
         var source = picture.Pixels;
         int longest = Math.Max(source.PixelWidth, source.PixelHeight);
-        double scale = Math.Min(Math.Max(1, Math.Min(2, Comfortable / longest)), (double)OcrEngine.MaxImageDimension / longest);
+        double scale = Math.Min(wanted > 0 ? wanted : Math.Max(1, Math.Min(2, Comfortable / longest)),
+            (double)OcrEngine.MaxImageDimension / longest);
         if (scale != 1) source = Images.Resize(source, Images.Percent(source.PixelWidth, scale * 100),
             Images.Percent(source.PixelHeight, scale * 100));
         if (!picture.Transparent) return source;

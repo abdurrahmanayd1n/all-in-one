@@ -9,25 +9,28 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using PixelFormat = System.Drawing.Imaging.PixelFormat;
 
-// A system-wide keyboard shortcut: Win+Shift and a letter.
+// A system-wide keyboard shortcut: Win+Shift (or Alt alone) and a letter.
 class Hotkey : NativeWindow, IDisposable
 {
-    public const string Keys = "Win+Shift+O"; // text from the screen
+    public const string QuickKeys = "Alt+Q"; // text from the screen, with one hand
+    public const string Keys = "Win+Shift+O"; // the same, for when another program owns Alt+Q
+    public const string TableKeys = "Alt+T"; // a table from the screen
     public const string PinKeys = "Win+Shift+U"; // keep a window on top
     public const string PasteKeys = "Win+Shift+Y"; // paste without formatting
     public const string CaseKeys = "Win+Shift+B"; // change the case and paste
     const int Message = 0x312;
-    const uint Shift = 4, Win = 8, NoRepeat = 0x4000;
+    const uint Alt = 1, Shift = 4, Win = 8, NoRepeat = 0x4000;
     readonly Action pressed;
     public readonly bool Works; // false when another program owns the shortcut
-    public readonly char Letter;
+    public readonly string Name;
 
-    public Hotkey(char letter, Action pressed)
+    // alt: Alt alone with the letter. AltGr (Ctrl+Alt) does not count, so Turkish AltGr+Q still types @.
+    public Hotkey(char letter, Action pressed, bool alt = false)
     {
-        Letter = letter;
+        Name = (alt ? "Alt+" : "Win+Shift+") + letter;
         this.pressed = pressed;
         CreateHandle(new CreateParams());
-        Works = Native.RegisterHotKey(Handle, 1, Win | Shift | NoRepeat, letter);
+        Works = Native.RegisterHotKey(Handle, 1, (alt ? Alt : Win | Shift) | NoRepeat, letter);
     }
 
     protected override void WndProc(ref Message m)
@@ -110,6 +113,13 @@ abstract class ScreenOverlay : Form
         }
     }
 
+    // Letting go of the Alt that opened the overlay must not start a menu loop that eats the first click.
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == 0x112 /* WM_SYSCOMMAND */ && (m.WParam.ToInt64() & 0xFFF0) == 0xF100 /* SC_KEYMENU */) return;
+        base.WndProc(ref m);
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         if (e.KeyCode == System.Windows.Forms.Keys.Escape) Close();
@@ -141,15 +151,22 @@ class ScreenText : ScreenOverlay
     Point from;
     Rectangle area;
     bool dragging;
+    readonly bool table; // the selection holds a table: keep its columns
 
     public static void Start()
     {
-        Open(screen => new ScreenText(screen), null);
+        Open(screen => new ScreenText(screen, false), null);
     }
 
-    ScreenText(Rectangle screen) : base(screen)
+    public static void StartTable()
     {
-        Text = "All In One - ekrandan metin";
+        Open(screen => new ScreenText(screen, true), null);
+    }
+
+    ScreenText(Rectangle screen, bool table) : base(screen)
+    {
+        this.table = table;
+        Text = table ? "All In One - ekrandan tablo" : "All In One - ekrandan metin";
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -163,7 +180,7 @@ class ScreenText : ScreenOverlay
             g.DrawImage(Frozen, area, area, GraphicsUnit.Pixel);
             g.DrawRectangle(Pens.White, area.X, area.Y, area.Width - 1, area.Height - 1);
         }
-        Hint(g, "Metni alınacak alanı sürükle  ·  Esc: vazgeç");
+        Hint(g, (table ? "Tabloyu sürükleyerek seç" : "Metni alınacak alanı sürükle") + "  ·  Esc: vazgeç");
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
@@ -188,7 +205,17 @@ class ScreenText : ScreenOverlay
         if (area.Width < 8 || area.Height < 8) return; // a click: wait for a real selection
         var crop = Frozen.Clone(area, PixelFormat.Format32bppArgb);
         Close();
-        Images.Start(() => { using (crop) return Recognize(crop); });
+        Images.Start(() => { using (crop) return table ? RecognizeTable(crop) : Recognize(crop); });
+    }
+
+    // Needs a single-threaded apartment for the clipboard.
+    public static Outcome RecognizeTable(Bitmap crop)
+    {
+        var rows = TableText.Read(AsPicture(crop));
+        if (rows.Length == 0) return new Outcome { Text = "Seçilen alanda metin bulunamadı." };
+        Ocr.ToClipboard(TableText.Tsv(rows));
+        return new Outcome { Text = "Tablo panoya kopyalandı\n" + rows.Length + " satır, " + rows[0].Length
+            + " sütun · Excel'e yapıştır" };
     }
 
     // The rectangle between two points, kept on the picture.

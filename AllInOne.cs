@@ -147,7 +147,7 @@ static class Tools
         var rename = new Item { Label = "Yeniden\nAdlandır", Icon = "\uE8AC", Run = () => RenameWindow.Open(files) };
         var settings = new Item { Label = "Ayarlar", Run = Preferences.Open };
         var users = new Item { Label = "Kim\nKullanıyor?", Icon = "", Run = () => UsersWindow.Open(files) };
-        var screen = new Item { Label = "Ekrandan\nMetin", Hint = Hotkey.Keys, Run = ScreenText.Start };
+        var screen = new Item { Label = "Ekrandan\nMetin", Hint = Hotkey.QuickKeys, Run = ScreenText.Start };
         // The outer ring of "Diğer": the rarer tools for pictures and videos. Its options are text only.
         Func<Item> more = () => new Item { Label = "Diğer", Hint = "Dışa kaydır", Icon = "\uE712",
             Children = (single == null ? new[] { copy, terminal, rename, users, screen, settings }
@@ -312,7 +312,7 @@ class App : ApplicationContext
     readonly NotifyIcon tray = new NotifyIcon();
     readonly Native.HookProc proc; // field keeps the delegate alive while the hook is installed
     readonly IntPtr hook;
-    readonly Hotkey hotkey, pinKey, pasteKey, caseKey;
+    readonly Hotkey quickKey, tableKey, hotkey, pinKey, pasteKey, caseKey;
 
     public App()
     {
@@ -323,12 +323,14 @@ class App : ApplicationContext
 
         using (var icon = Assets.Open("app.ico")) tray.Icon = new Icon(icon, SystemInformation.SmallIconSize);
         tray.Text = "All In One (dosya seç, Sol Alt basılı tut)";
+        quickKey = new Hotkey('Q', ScreenText.Start, true);
+        tableKey = new Hotkey('T', ScreenText.StartTable, true);
         hotkey = new Hotkey('O', ScreenText.Start);
         pinKey = new Hotkey('U', Pinner.ToggleFront);
         pasteKey = new Hotkey('Y', () => Paster.Paste(TextForm.Plain));
         caseKey = new Hotkey('B', Paster.Choose);
-        foreach (var key in new[] { hotkey, pinKey, pasteKey, caseKey }.Where(k => !k.Works))
-            Log.Error("Bir kısayol başka bir programda kayıtlı olduğu için alınamadı: Win+Shift+" + key.Letter);
+        foreach (var key in new[] { quickKey, tableKey, hotkey, pinKey, pasteKey, caseKey }.Where(k => !k.Works))
+            Log.Error("Bir kısayol başka bir programda kayıtlı olduğu için alınamadı: " + key.Name);
         var pins = new MenuItem("Sabitlenen pencereler");
         var picker = new MenuItem("Renk seçici simgesi", (s, e) =>
         {
@@ -339,7 +341,9 @@ class App : ApplicationContext
         {
             new MenuItem("Renk seç", (s, e) => Picker.Pick()),
             picker,
-            new MenuItem("Ekrandan metin al" + (hotkey.Works ? "\t" + Hotkey.Keys : ""), (s, e) => ScreenText.Start()),
+            new MenuItem("Ekrandan metin al" + (quickKey.Works ? "\t" + quickKey.Name : hotkey.Works ? "\t" + hotkey.Name : ""),
+                (s, e) => ScreenText.Start()),
+            new MenuItem("Ekrandan tablo al" + (tableKey.Works ? "\t" + tableKey.Name : ""), (s, e) => ScreenText.StartTable()),
             pins,
             new MenuItem("Düz yapıştır: " + (pasteKey.Works ? Hotkey.PasteKeys : "kısayol kullanımda")
                 + "   ·   Harf çevir: " + (caseKey.Works ? Hotkey.CaseKeys : "kısayol kullanımda")) { Enabled = false },
@@ -366,6 +370,7 @@ class App : ApplicationContext
             state = State.Cancelled;
             Run(action);
         };
+        Uninstall.Quit = ExitThread;
         menu.WarmUp();
         Images.Background(Target.WarmUp);
     }
@@ -374,6 +379,8 @@ class App : ApplicationContext
     {
         Native.UnhookWindowsHookEx(hook);
         Pinner.ReleaseAll(); // nothing stays stuck on top after the app has gone
+        quickKey.Dispose();
+        tableKey.Dispose();
         hotkey.Dispose();
         pinKey.Dispose();
         pasteKey.Dispose();
@@ -754,6 +761,28 @@ static class Program
             var dragArea = ScreenText.Between(new Point(50, 80), new Point(-10, 20), new Size(100, 60));
             ok &= dragArea == new Rectangle(0, 20, 50, 40);
 
+            // Tables: words become rows and columns by their places alone; a title above and an empty cell stay put.
+            Func<string, double, double, double, Word> word = (text, x, y, width) =>
+                new Word { Text = text, X = x, Y = y, Width = width, Height = 20 };
+            var table = TableText.Rows(new[]
+            {
+                word("Aylık", 0, 0, 60), word("gider", 68, 1, 60), word("raporu", 136, 0, 300),
+                word("Kalem", 0, 40, 60), word("Tutar", 300, 42, 50), word("Not", 500, 39, 40),
+                word("=2+2", 0, 80, 50), word("-1.250", 310, 80, 60),
+                word("Ev", 0, 120, 25), word("kirası", 33, 121, 55), word("900", 320, 120, 40), word("peşin", 505, 118, 55)
+            });
+            ok &= table.Length == 4 && table.All(r => r.Length == 3)
+                && TableText.Tsv(table) == "Aylık gider raporu\t\t\r\nKalem\tTutar\tNot\r\n'=2+2\t-1.250\t\r\nEv kirası\t900\tpeşin"
+                && TableText.Rows(new Word[0]).Length == 0
+                && TableText.Rows(new[] { word("1", 0, 0, 8), word("5,00", 14, 0, 40) })[0][0] == "15,00"
+                && TableText.Rows(new[] { word("4,", 0, 0, 16), word("50", 22, 0, 20) })[0][0] == "4,50";
+            // Three readings vote: the odd shape is left out, the majority wins, a text beats a gap.
+            var voted = TableText.Agree(new System.Collections.Generic.List<string[][]> {
+                new[] { new[] { "4150", "", "x" } }, new[] { new[] { "tek" } },
+                new[] { new[] { "4,50", "", "x" } }, new[] { new[] { "4,50", "3", "y" } } });
+            ok &= voted.Length == 1 && string.Join("|", voted[0]) == "4,50|3|x"
+                && TableText.Agree(new System.Collections.Generic.List<string[][]> { new string[0][] }).Length == 0;
+
             // Colours: text forms, newest first without repeats, a bounded list, and a magnifier that stays on screen.
             string colorKey = @"Software\AllInOne-test-" + Guid.NewGuid().ToString("N"), ownKey = Prefs.Store;
             Prefs.Store = colorKey;
@@ -908,6 +937,38 @@ static class Program
                     && "All In One".Equals(Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\" + idKey, "DisplayName", null));
             }
             finally { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(idKey, false); }
+
+            // Uninstalling takes away the app's own keys, entries and files, and nothing else.
+            string gone = @"Software\AllInOne-test-" + Guid.NewGuid().ToString("N"), keptStore = Prefs.Store,
+                keptRun = Prefs.RunList, keptApproved = Prefs.Approved, keptLog = Log.Folder;
+            Prefs.Store = gone + @"\ayar";
+            Prefs.RunList = gone + @"\acilis";
+            Prefs.Approved = gone + @"\onay";
+            Log.Folder = Path.Combine(dir, "silinecek");
+            try
+            {
+                Prefs.Autostart = true;
+                Prefs.CopyRgb = true;
+                Toast.Register(@"HKEY_CURRENT_USER\" + gone + @"\kimlik", Log.Folder);
+                Log.Info("x");
+                string others = Path.Combine(Log.Folder, "benim.txt");
+                File.WriteAllText(others, "kalmali");
+                Uninstall.Remove(gone + @"\kimlik");
+                Log.Info("sonradan");
+                using (var left = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(gone))
+                    ok &= left != null && left.OpenSubKey("ayar") == null && left.OpenSubKey("kimlik") == null
+                        && left.OpenSubKey("acilis").GetValue("AllInOne") == null
+                        && Directory.GetFiles(Log.Folder).Length == 1 && File.Exists(others);
+            }
+            finally
+            {
+                Log.Off = false;
+                Prefs.Store = keptStore;
+                Prefs.RunList = keptRun;
+                Prefs.Approved = keptApproved;
+                Log.Folder = keptLog;
+                Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(gone, false);
+            }
 
             // A transparent image is not flattened without consent.
             string clear = Path.Combine(dir, "b.png");

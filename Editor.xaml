@@ -284,6 +284,8 @@
           <CheckBox x:Name="FixedSuffix" Content="Her dosyaya sabit ek ekle" Margin="0,0,0,10"/>
           <TextBox x:Name="FixedSuffixBox" MaxLength="60" AutomationProperties.Name="Sabit ek"/>
           <TextBlock x:Name="FixedSuffixHint" Style="{StaticResource Label}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+          <Border Height="1" Background="#2E303A" Margin="0,16,0,16"/>
+          <Button x:Name="Uninstall" Content="Uygulamayı kaldır…" HorizontalAlignment="Left" Padding="14,9"/>
         </StackPanel>
       </ScrollViewer>
 
@@ -503,7 +505,7 @@
           <Image x:Name="AboutIcon" Width="96" Height="96" Margin="0,0,0,18"/>
           <TextBlock Text="All In One" FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,10"/>
           <TextBlock Foreground="#A6A9B4" TextAlignment="Center" TextWrapping="Wrap" LineHeight="21"
-                     Text="Dosya gezgininde veya masaüstünde dosya seç, sonra Sol Alt tuşunu basılı tut. Birden fazla dosya için Ctrl ile tıkla. Ekranın herhangi bir yerindeki metni almak için Win+Shift+O, öndeki pencereyi üstte tutmak için Win+Shift+U, biçimsiz yapıştırmak için Win+Shift+Y, harf çevirip yapıştırmak için Win+Shift+B."/>
+                     Text="Dosya gezgininde veya masaüstünde dosya seç, sonra Sol Alt tuşunu basılı tut. Birden fazla dosya için Ctrl ile tıkla. Ekranın herhangi bir yerindeki metni almak için Alt+Q (veya Win+Shift+O), bir tabloyu sütunlarıyla almak için Alt+T, öndeki pencereyi üstte tutmak için Win+Shift+U, biçimsiz yapıştırmak için Win+Shift+Y, harf çevirip yapıştırmak için Win+Shift+B."/>
         </StackPanel>
         <Grid x:Name="Frame" HorizontalAlignment="Center" VerticalAlignment="Center">
           <!-- Checkerboard: shows where the picture is transparent -->

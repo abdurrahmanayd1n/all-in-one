@@ -11,7 +11,8 @@ using Windows.UI.Notifications;
 static class Toast
 {
     const string AppId = "AllInOne.App";
-    public const string Identity = @"HKEY_CURRENT_USER\Software\Classes\AppUserModelId\" + AppId;
+    public const string IdentityKey = @"Software\Classes\AppUserModelId\" + AppId; // under HKEY_CURRENT_USER
+    public const string Identity = @"HKEY_CURRENT_USER\" + IdentityKey;
 
     // Name and icon under which Windows shows the notifications. The app writes them itself, so a downloaded
     // exe works without kur.ps1.

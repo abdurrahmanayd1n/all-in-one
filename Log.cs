@@ -10,6 +10,7 @@ static class Log
     // The self-test and the tests write somewhere else.
     public static string Folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AllInOne");
     public const long Largest = 1048576; // then the file is set aside and a new one begins
+    public static bool Off; // after uninstalling
     static readonly object gate = new object();
     static DateTime told = DateTime.MinValue;
 
@@ -36,6 +37,7 @@ static class Log
     // Writing the log must never be the thing that fails.
     static void Write(string kind, string what, Exception e)
     {
+        if (Off) return;
         try
         {
             lock (gate)

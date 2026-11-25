@@ -147,6 +147,8 @@ class Preferences
             }
         });
 
+        Get<Button>("Uninstall").Click += (s, e) => Uninstall.Ask();
+
         var use = Get<CheckBox>("FixedSuffix");
         var suffix = Get<TextBox>("FixedSuffixBox");
         use.IsChecked = Naming.UseSuffix;

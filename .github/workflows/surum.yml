@@ -13,6 +13,11 @@ jobs:
       - name: Derle ve sina
         shell: powershell
         run: .\kur.ps1 -Derle
+      - name: Etiket ile exe surumu ayni mi
+        shell: powershell
+        run: |
+          $version = (Get-Item bin\AllInOne.exe).VersionInfo.ProductVersion
+          if ("v$version" -ne $env:GITHUB_REF_NAME) { throw "Etiket $env:GITHUB_REF_NAME, exe surumu $version" }
       - name: Surumu yayimla
         shell: powershell
         env:
