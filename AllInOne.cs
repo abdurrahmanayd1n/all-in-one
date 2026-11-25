@@ -371,6 +371,13 @@ class App : ApplicationContext
             Run(action);
         };
         Uninstall.Quit = ExitThread;
+        string saved = null; // the file the last icon notification is about
+        Toast.Tray = outcome =>
+        {
+            saved = outcome.File;
+            tray.ShowBalloonTip(5000, saved != null ? "Kaydedildi" : "All In One", Toast.TrayText(outcome), ToolTipIcon.None);
+        };
+        tray.BalloonTipClicked += (s, e) => { if (saved != null) Toast.Reveal(saved); };
         menu.WarmUp();
         Images.Background(Target.WarmUp);
     }
@@ -937,6 +944,12 @@ static class Program
                     && "All In One".Equals(Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\" + idKey, "DisplayName", null));
             }
             finally { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(idKey, false); }
+
+            // Before Windows 11 the tray icon notifies; its text must fit and never be empty.
+            string longText = Toast.TrayText(new Outcome { File = "x", Text = new string('a', 400) });
+            ok &= Toast.UsesTray(19045) && !Toast.UsesTray(22000) && Toast.Build > 9600 && longText.Length == 255
+                && longText.EndsWith("tıkla.") && Toast.TrayText(new Outcome { Text = "" }) == "Tamamlandı."
+                && Toast.TrayText(new Outcome { Text = "bilgi" }) == "bilgi";
 
             // Uninstalling takes away the app's own keys, entries and files, and nothing else.
             string gone = @"Software\AllInOne-test-" + Guid.NewGuid().ToString("N"), keptStore = Prefs.Store,

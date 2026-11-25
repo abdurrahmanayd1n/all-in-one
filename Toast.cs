@@ -41,8 +41,40 @@ static class Toast
         return "<toast><visual><binding template=\"ToastGeneric\">" + texts + "</binding></visual>" + button + "</toast>";
     }
 
+    // Windows 10 can drop, without saying so, the notifications of a program that has no Start menu shortcut,
+    // so there the icon next to the clock raises them.
+    public static Action<Outcome> Tray; // set by the running app
+
+    public static bool UsesTray(int build) { return build < 22000; } // before Windows 11
+
+    // The true build number: Environment.OSVersion answers 6.2 to a program without a manifest.
+    public static int Build
+    {
+        get
+        {
+            int build;
+            var value = Microsoft.Win32.Registry.GetValue(
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "CurrentBuildNumber", null) as string;
+            return int.TryParse(value, out build) ? build : 0;
+        }
+    }
+
+    // The icon's notification takes at most 255 characters and no empty text.
+    public static string TrayText(Outcome outcome)
+    {
+        string tail = outcome.File != null ? "\nKlasörde göstermek için tıkla." : "";
+        string text = string.IsNullOrWhiteSpace(outcome.Text) ? "Tamamlandı." : outcome.Text;
+        int room = 255 - tail.Length;
+        return (text.Length > room ? text.Substring(0, room - 1) + "…" : text) + tail;
+    }
+
     public static void Show(Outcome outcome)
     {
+        if (Tray != null && UsesTray(Build))
+        {
+            Tray(outcome);
+            return;
+        }
         try
         {
             var xml = new XmlDocument();
@@ -60,7 +92,7 @@ static class Toast
         }
     }
 
-    static void Reveal(string file)
+    public static void Reveal(string file)
     {
         try
         {
