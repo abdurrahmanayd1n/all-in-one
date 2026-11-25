@@ -17,6 +17,10 @@ jobs:
       - name: Derle ve oz test
         shell: powershell
         run: .\kur.ps1 -Derle
+      - name: Basarisiz kontrolun satirini bul
+        if: failure()
+        shell: powershell
+        run: .\.github\hata-satiri.ps1
       - name: Uygulamayi ac, ayakta kaldigini ve hata yazmadigini dogrula
         shell: powershell
         run: |
