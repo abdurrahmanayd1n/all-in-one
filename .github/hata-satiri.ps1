@@ -27,3 +27,10 @@ if (Test-Path "$probe\probe.exe") {
     $p = Start-Process "$probe\probe.exe" '--test' -Wait -PassThru; "cikis kodu: $($p.ExitCode)"
     if ($p.ExitCode -ge 1000) { $at = $p.ExitCode - 1000; "satir $($at) oncesi:"; $lines[($at-7)..($at-1)] }
 }
+
+# A crash (not a failed check) leaves its stack in the Windows event log.
+if ($p -and ($p.ExitCode -lt 0)) {
+    Start-Sleep -Seconds 3
+    Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = '.NET Runtime'; StartTime = (Get-Date).AddMinutes(-5) } -ErrorAction SilentlyContinue |
+        Select-Object -First 1 | ForEach-Object { $_.Message }
+}
