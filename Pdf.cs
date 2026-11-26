@@ -145,8 +145,22 @@ static class Pdf
         if (work.Status != AsyncStatus.Completed) throw new IOException(Lang.T("PDF açılamadı (parolalı veya bozuk olabilir)."), work.ErrorCode);
     }
 
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern bool TerminateProcess(IntPtr process, int code);
+    static int guarded;
+
+    // Where there is no graphics card (virtual machines), Windows' reader crashes while the process unloads its
+    // libraries. Once it has been used, the process is therefore ended without that step. This happens after the
+    // app's own work: the event comes when no thread of ours is still busy.
+    static void EndWithoutUnloading()
+    {
+        if (System.Threading.Interlocked.Exchange(ref guarded, 1) != 0) return;
+        AppDomain.CurrentDomain.ProcessExit += (s, e) => TerminateProcess(GetCurrentProcess(), Environment.ExitCode);
+    }
+
     public static PdfDocument Open(string path)
     {
+        EndWithoutUnloading();
         var data = File.ReadAllBytes(path);
         var stream = new InMemoryRandomAccessStream();
         var writer = new DataWriter(stream);

@@ -628,7 +628,8 @@ static class Program
     {
         Native.SetProcessDPIAware();
         Application.EnableVisualStyles();
-        if (args.Length > 0 && args[0] == "--test") return SelfTest();
+        // Also kept in Environment.ExitCode, which is what counts if the process is ended early (see Pdf.cs).
+        if (args.Length > 0 && args[0] == "--test") return Environment.ExitCode = SelfTest();
 
         bool first;
         using (new Mutex(true, @"Local\AllInOne", out first))
