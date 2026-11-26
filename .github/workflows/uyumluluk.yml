@@ -23,6 +23,10 @@ jobs:
         shell: powershell
         run: |
           $found = @(Get-Content "$env:TEMP\AllInOne-test.txt" -Encoding UTF8 -ErrorAction SilentlyContinue)
+          # A native crash is told by Windows alone: which module, which error.
+          Start-Sleep -Seconds 3
+          $found += @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'Application Error', '.NET Runtime'; StartTime = (Get-Date).AddMinutes(-10) } -ErrorAction SilentlyContinue |
+              Select-Object -First 2 | ForEach-Object { $_.Message -split "`r?`n" | Select-Object -First 14 })
           $found += @(.\.github\hata-satiri.ps1 | ForEach-Object { "$_" })
           $found
           "::error::" + (($found | Select-Object -First 60) -join '%0A')

@@ -30,19 +30,26 @@ static class Tests
         Directory.CreateDirectory(dir);
         try
         {
-            Keys();
-            Capture(dir);
-            Videos(dir);
-            Pdfs(dir);
-            Tables();
-            Previews(dir);
-            Scrolling();
-            Sounds(dir);
-            FileTools(dir);
-            InEnglish(dir);
+            // Each part is noted before it runs: after a crash the last note says where it happened.
+            Note("tuslar"); Keys();
+            Note("goruntu"); Capture(dir);
+            Note("video"); Videos(dir);
+            Note("pdf"); Pdfs(dir);
+            Note("tablo"); Tables();
+            Note("onizleme"); Previews(dir);
+            Note("kayan"); Scrolling();
+            Note("ses"); Sounds(dir);
+            Note("dosya araclari"); FileTools(dir);
+            Note("ingilizce"); InEnglish(dir);
+            Note("bitti");
         }
         catch (Exception e) { Expect(false, e.ToString()); }
         return ok;
+    }
+
+    static void Note(string part)
+    {
+        File.AppendAllText(report, "> " + part + Environment.NewLine);
     }
 
     // Texts of a window that still carry letters English does not have.
