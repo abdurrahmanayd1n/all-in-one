@@ -71,7 +71,7 @@ class Bundle : IDisposable
     public void Finish(Outcome report)
     {
         if (zip == null) return;
-        if (broken) throw new IOException("ZIP dosyası yazılamadı.");
+        if (broken) throw new IOException(Lang.T("ZIP dosyası yazılamadı."));
         zip.Dispose();
         finished = true;
         var lines = report.Text.Split('\n');
@@ -95,7 +95,7 @@ class Candidate
     public int Quality, Width, Height;
     public bool Resized;
 
-    public string Note { get { return "kalite " + Quality + (Resized ? ", boyut " + Width + " × " + Height : ""); } }
+    public string Note { get { return "kalite " + Quality + (Resized ? Lang.T(", boyut ") + Width + " × " + Height : ""); } }
 }
 
 // Output file names, including the fixed suffix the user can choose to add to every saved file.
@@ -142,14 +142,14 @@ static class Naming
     // Why the name cannot be used, or null when it is fine.
     public static string Problem(string name)
     {
-        if (string.IsNullOrWhiteSpace(name)) return "Dosya adı boş olamaz.";
-        if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return "Adda \\ / : * ? \" < > | kullanılamaz.";
-        if (name.EndsWith(".") || name.EndsWith(" ")) return "Ad nokta veya boşlukla bitemez.";
+        if (string.IsNullOrWhiteSpace(name)) return Lang.T("Dosya adı boş olamaz.");
+        if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return Lang.T("Adda \\ / : * ? \" < > | kullanılamaz.");
+        if (name.EndsWith(".") || name.EndsWith(" ")) return Lang.T("Ad nokta veya boşlukla bitemez.");
         string stem = name.Split('.')[0].TrimEnd().ToUpperInvariant();
         bool device = stem == "CON" || stem == "PRN" || stem == "AUX" || stem == "NUL"
             || (stem.Length == 4 && (stem.StartsWith("COM") || stem.StartsWith("LPT")) && char.IsDigit(stem[3]));
-        if (device) return "Bu ad Windows tarafından ayrılmış.";
-        return name.Length > 200 ? "Ad çok uzun." : null;
+        if (device) return Lang.T("Bu ad Windows tarafından ayrılmış.");
+        return name.Length > 200 ? Lang.T("Ad çok uzun.") : null;
     }
 }
 
@@ -191,7 +191,7 @@ static class Images
             catch (Exception e)
             {
                 Log.Error("tek tıkla işlem", e);
-                Show("İşlem yapılamadı:\n" + e.Message, MessageBoxButton.OK);
+                Show(Lang.T("İşlem yapılamadı:\n") + e.Message, MessageBoxButton.OK);
             }
         });
     }
@@ -229,7 +229,7 @@ static class Images
                 problem = problem ?? Path.GetFileName(files[i]) + ": " + e.Message;
             }
         }
-        string text = saved + " dosya kaydedildi" + (skipped > 0 ? ", " + skipped + " atlandı" : "")
+        string text = saved + Lang.T(" dosya kaydedildi") + (skipped > 0 ? ", " + skipped + Lang.T(" atlandı") : "")
             + (failed > 0 ? ", " + failed + " hata" : "")
             + (saved > 0 ? "\nToplam " + Size(before) + " → " + Size(after) + " · " + Difference(before, after) : "")
             + (failed > 0 ? "\n" + problem : "");
@@ -251,7 +251,7 @@ static class Images
 
     public static bool AskWhiteBackground()
     {
-        return Show("Bu görselde saydam alanlar var. Yeni dosyada beyaz olacaklar. Devam edilsin mi?",
+        return Show(Lang.T("Bu görselde saydam alanlar var. Yeni dosyada beyaz olacaklar. Devam edilsin mi?"),
             MessageBoxButton.YesNo) == MessageBoxResult.Yes;
     }
 
@@ -263,7 +263,7 @@ static class Images
             var decoder = BitmapDecoder.Create(stream,
                 BitmapCreateOptions.PreservePixelFormat | BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
             if (decoder.Frames.Count > 1 && ext != ".heic")
-                throw new NotSupportedException("Animasyonlu veya çok sayfalı görseller desteklenmiyor.");
+                throw new NotSupportedException(Lang.T("Animasyonlu veya çok sayfalı görseller desteklenmiyor."));
             var frame = decoder.Frames[0];
 
             ReadOnlyCollection<ColorContext> colors = null;
@@ -341,7 +341,7 @@ static class Images
 
     static byte[] EncodeWebp(BitmapSource source, int quality)
     {
-        if (Ffmpeg == null) throw new NotSupportedException("WebP için FFmpeg bulunamadı.");
+        if (Ffmpeg == null) throw new NotSupportedException(Lang.T("WebP için FFmpeg bulunamadı."));
         string stem = Path.Combine(Path.GetTempPath(), "AllInOne-" + Guid.NewGuid().ToString("N"));
         string input = stem + ".png", output = stem + ".webp";
         try
@@ -354,7 +354,7 @@ static class Images
             {
                 string errors = process.StandardError.ReadToEnd();
                 process.WaitForExit();
-                if (process.ExitCode != 0) throw new IOException("WebP oluşturulamadı: " + errors.Trim());
+                if (process.ExitCode != 0) throw new IOException(Lang.T("WebP oluşturulamadı: ") + errors.Trim());
             }
             return File.ReadAllBytes(output);
         }
@@ -436,7 +436,7 @@ static class Images
                 if (HasTransparency(source)) source = WithClearColor(source);
                 break;
             case ".tif": case ".tiff": encoder = new TiffBitmapEncoder { Compression = TiffCompressOption.Zip }; break;
-            default: throw new NotSupportedException("Bu biçime kaydedilemiyor: " + ext);
+            default: throw new NotSupportedException(Lang.T("Bu biçime kaydedilemiyor: ") + ext);
         }
         if (encoder is JpegBitmapEncoder || encoder is BmpBitmapEncoder) source = OnWhite(source);
         encoder.Frames.Add(BitmapFrame.Create(source, null, null, colors));
@@ -464,7 +464,7 @@ static class Images
 
     public static BitmapSource Resize(BitmapSource source, int w, int h)
     {
-        if (w < 1 || h < 1 || (long)w * h > MaxPixels) throw new NotSupportedException("Geçersiz boyut: " + w + " × " + h);
+        if (w < 1 || h < 1 || (long)w * h > MaxPixels) throw new NotSupportedException(Lang.T("Geçersiz boyut: ") + w + " × " + h);
         if (w == source.PixelWidth && h == source.PixelHeight) return source;
         var group = new DrawingGroup();
         RenderOptions.SetBitmapScalingMode(group, BitmapScalingMode.HighQuality);
@@ -518,10 +518,10 @@ static class Images
     // How the new file size compares to the old one.
     public static string Difference(long before, long after)
     {
-        if (after == before) return "Boyut aynı";
+        if (after == before) return Lang.T("Boyut aynı");
         int percent = (int)Math.Round(Math.Abs(after - before) * 100.0 / before);
-        return (percent == 0 ? "" : "%" + percent + " ") + (after < before
-            ? "daha küçük · " + Size(before - after) + " kazanç" : "daha büyük · +" + Size(after - before));
+        return (percent == 0 ? "" : Lang.Percent(percent) + " ") + (after < before
+            ? Lang.T("daha küçük · ") + Size(before - after) + Lang.T(" kazanç") : Lang.T("daha büyük · +") + Size(after - before));
     }
 
     // The name of a format as shown to the user.
@@ -546,7 +546,7 @@ static class Images
     {
         long before = new FileInfo(original).Length;
         if (onlyIfSmaller && data.Length >= before)
-            return new Outcome { Text = "Dosya küçülmediği için kaydedilmedi. Kaliteyi düşürmeyi dene." };
+            return new Outcome { Text = Lang.T("Dosya küçülmediği için kaydedilmedi. Kaliteyi düşürmeyi dene.") };
         string target = bundle == null ? SaveNew(original, name, ext, data) : bundle.Add(name, ext, data);
         return new Outcome { File = target, Bytes = data.Length, Text = Path.GetFileName(target) + "\n" + Size(before)
             + " → " + Size(data.Length) + " · " + Difference(before, data.Length) };
@@ -602,7 +602,7 @@ static class Images
         int quality = Lowest(SmartFloor, SmartCeiling, q =>
         {
             var look = Decode(encode(q), ext);
-            if (look == null) throw new NotSupportedException("Bu biçim geri okunamadığı için kalite ölçülemiyor.");
+            if (look == null) throw new NotSupportedException(Lang.T("Bu biçim geri okunamadığı için kalite ölçülemiyor."));
             return Similarity(original, Luma(look), source.PixelWidth, source.PixelHeight) >= LooksSame(ext);
         });
         return new Candidate { Data = encode(quality), Quality = quality, Width = source.PixelWidth, Height = source.PixelHeight };
@@ -632,7 +632,7 @@ static class Images
             if (w < 16 || h < 16) break;
             current = Resize(source, w, h);
         }
-        throw new NotSupportedException("Bu görsel " + Size(limit) + " altına indirilemedi.");
+        throw new NotSupportedException(Lang.T("Bu görsel ") + Size(limit) + Lang.T(" altına indirilemedi."));
     }
 
     // Brightness of each pixel, transparent areas seen against white.
@@ -684,7 +684,7 @@ static class Images
 
     public static Outcome CompressUnder(string path, int kilobytes)
     {
-        if (new FileInfo(path).Length <= kilobytes * 1024L) return new Outcome { Text = "Dosya zaten " + kilobytes + " KB altında." };
+        if (new FileInfo(path).Length <= kilobytes * 1024L) return new Outcome { Text = Lang.T("Dosya zaten ") + kilobytes + Lang.T(" KB altında.") };
         var picture = Load(path);
         string ext = CompressedFormat(path, picture);
         var found = UnderSize(picture.Pixels, picture.Colors, ext, kilobytes * 1024L);
@@ -694,7 +694,7 @@ static class Images
     public static Outcome Noted(Outcome outcome, Candidate found)
     {
         if (outcome.File != null) outcome.Text += " · " + found.Note;
-        else outcome.Text = "Dosya zaten verimli: küçülmediği için kaydedilmedi.";
+        else outcome.Text = Lang.T("Dosya zaten verimli: küçülmediği için kaydedilmedi.");
         return outcome;
     }
 

@@ -279,8 +279,17 @@
           <TextBlock Style="{StaticResource Label}" TextWrapping="Wrap" Margin="0,0,0,16"
                      Text="Sol Alt bu kadar basılı tutulunca menü açılır. Çok kısa süre Alt kısayollarıyla karışabilir."/>
           <CheckBox x:Name="Autostart" Content="Bilgisayar açılınca başlat" Margin="0,0,0,12"/>
-          <CheckBox x:Name="ShowPicker" Content="Renk seçici simgesini göster" Margin="0,0,0,16"/>
+          <CheckBox x:Name="ShowPicker" Content="Renk seçici simgesini göster" Margin="0,0,0,12"/>
+          <CheckBox x:Name="PreviewKey" Content="Alt+Space ile seçili dosyayı önizle" Margin="0,0,0,16"/>
+          <TextBlock Style="{StaticResource Label}" Text="Dil / Language (yeniden başlatınca uygulanır)" TextWrapping="Wrap"/>
+          <WrapPanel x:Name="TongueChips" Margin="0,0,0,8"/>
           <Border Height="1" Background="#2E303A" Margin="0,0,0,16"/>
+          <TextBlock Style="{StaticResource Label}" TextWrapping="Wrap"
+                     Text="Kısayollar: kutuya tıkla, yeni tuşlara bas. Delete kapatır, Esc vazgeçer."/>
+          <StackPanel x:Name="Keys" Margin="0,0,0,4"/>
+          <TextBlock x:Name="KeysHint" Style="{StaticResource Label}" TextWrapping="Wrap" Foreground="#FF8A80" Visibility="Collapsed"/>
+          <Button x:Name="KeysReset" Content="Kısayolları varsayılana döndür" HorizontalAlignment="Left" Padding="14,7" Margin="0,0,0,8"/>
+          <Border Height="1" Background="#2E303A" Margin="0,8,0,16"/>
           <CheckBox x:Name="FixedSuffix" Content="Her dosyaya sabit ek ekle" Margin="0,0,0,10"/>
           <TextBox x:Name="FixedSuffixBox" MaxLength="60" AutomationProperties.Name="Sabit ek"/>
           <TextBlock x:Name="FixedSuffixHint" Style="{StaticResource Label}" TextWrapping="Wrap" Margin="0,6,0,0"/>
@@ -325,6 +334,34 @@
           <StackPanel x:Name="ZipLevelPanel" Visibility="Collapsed">
             <TextBlock Style="{StaticResource Label}" Text="Sıkıştırma"/>
             <WrapPanel x:Name="ZipLevelChips" Margin="0,0,0,6"/>
+          </StackPanel>
+
+          <!-- Files that are joined, in the order they will follow each other -->
+          <StackPanel x:Name="OrderPanel" Visibility="Collapsed">
+            <TextBlock Style="{StaticResource Label}" Text="Sıra (oklarla değiştir)"/>
+            <StackPanel x:Name="OrderRows" Margin="0,0,0,10"/>
+          </StackPanel>
+
+          <!-- Pages of one PDF -->
+          <StackPanel x:Name="PdfSplitPanel" Visibility="Collapsed">
+            <TextBlock Style="{StaticResource Label}" Text="Ayırma şekli"/>
+            <WrapPanel x:Name="PdfSplitChips" Margin="0,0,0,6"/>
+            <StackPanel x:Name="PdfRangePanel">
+              <TextBlock Style="{StaticResource Label}" Text="Sayfalar (örnek: 1-3, 5)"/>
+              <TextBox x:Name="PdfRangeBox" MaxLength="200" Margin="0,0,0,12" AutomationProperties.Name="Sayfalar"/>
+            </StackPanel>
+          </StackPanel>
+
+          <StackPanel x:Name="VideoTrimPanel" Visibility="Collapsed">
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+              <StackPanel><TextBlock Style="{StaticResource Label}" Text="Başlangıç (sn, dk:sn)"/><TextBox x:Name="TrimStartBox" MaxLength="10" Text="0"/></StackPanel>
+              <StackPanel Grid.Column="2"><TextBlock Style="{StaticResource Label}" Text="Bitiş (0: sonuna kadar)"/><TextBox x:Name="TrimEndBox" MaxLength="10" Text="0"/></StackPanel>
+            </Grid>
+            <TextBlock Style="{StaticResource Label}" Text="Kesme şekli"/>
+            <WrapPanel x:Name="TrimChips" Margin="0,0,0,6"/>
+            <TextBlock Style="{StaticResource Label}" TextWrapping="Wrap" Margin="0,0,0,12"
+                       Text="Hızlı: saniyeler sürer, kalite kaybı olmaz, başlangıç birkaç saniye öne kayabilir. Hassas: tam istenen kareden başlar, video yeniden kodlanır."/>
           </StackPanel>
 
           <!-- Video tools -->
@@ -504,8 +541,7 @@
         <StackPanel x:Name="About" MaxWidth="380" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
           <Image x:Name="AboutIcon" Width="96" Height="96" Margin="0,0,0,18"/>
           <TextBlock Text="All In One" FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-          <TextBlock Foreground="#A6A9B4" TextAlignment="Center" TextWrapping="Wrap" LineHeight="21"
-                     Text="Dosya gezgininde veya masaüstünde dosya seç, sonra Sol Alt tuşunu basılı tut. Birden fazla dosya için Ctrl ile tıkla. Ekranın herhangi bir yerindeki metni almak için Alt+Q (veya Win+Shift+O), bir tabloyu sütunlarıyla almak için Alt+T, öndeki pencereyi üstte tutmak için Win+Shift+U, biçimsiz yapıştırmak için Win+Shift+Y, harf çevirip yapıştırmak için Win+Shift+B."/>
+          <TextBlock x:Name="AboutText" Foreground="#A6A9B4" TextAlignment="Center" TextWrapping="Wrap" LineHeight="21"/>
         </StackPanel>
         <Grid x:Name="Frame" HorizontalAlignment="Center" VerticalAlignment="Center">
           <!-- Checkerboard: shows where the picture is transparent -->

@@ -65,7 +65,7 @@ class ColorPick : ScreenOverlay
     public ColorPick(Rectangle screen, Action<Color> picked) : base(screen)
     {
         this.picked = picked;
-        Text = "All In One - renk seç";
+        Text = Lang.T("All In One - renk seç");
     }
 
     // Beside the pointer, on the other side where it would leave the screen.
@@ -106,7 +106,7 @@ class ColorPick : ScreenOverlay
     {
         var g = e.Graphics;
         g.DrawImage(Frozen, e.ClipRectangle, e.ClipRectangle, GraphicsUnit.Pixel);
-        Hint(g, "Rengini almak istediğin yere tıkla  ·  ok tuşları: 1 piksel  ·  Esc: vazgeç");
+        Hint(g, Lang.T("Rengini almak istediğin yere tıkla  ·  ok tuşları: 1 piksel  ·  Esc: vazgeç"));
         var box = Magnifier(at, Frozen.Size);
         var color = Under(at);
         using (var back = new SolidBrush(Color.FromArgb(27, 28, 35))) g.FillRectangle(back, box);
@@ -218,7 +218,7 @@ static class Picker
         using (var picture = Draw(last)) drawn = picture.GetHicon();
         icon.Icon = Icon.FromHandle(drawn);
         if (previous != IntPtr.Zero) Native.DestroyIcon(previous);
-        icon.Text = "Renk se\u00e7" + (all.Count > 0 ? " \u00b7 son: " + ColorStore.Text(last) : "") + " \u00b7 sa\u011f t\u0131k: liste";
+        icon.Text = Lang.T("Renk se\u00e7") + (all.Count > 0 ? " \u00b7 son: " + ColorStore.Text(last) : "") + Lang.T(" \u00b7 sa\u011f t\u0131k: liste");
     }
 
     // A rounded square of the colour with an eyedropper on it.
@@ -280,9 +280,9 @@ static class Picker
         try
         {
             Clip(text);
-            return text + " kopyaland\u0131";
+            return text + Lang.T(" kopyaland\u0131");
         }
-        catch (Exception e) { return "Panoya kopyalanamad\u0131: " + e.Message; }
+        catch (Exception e) { return Lang.T("Panoya kopyalanamad\u0131: ") + e.Message; }
     }
 
     public static Media.Color Convert(Color c) { return Media.Color.FromRgb(c.R, c.G, c.B); }
@@ -436,7 +436,7 @@ class ColorHistory
                 BorderThickness = new Wpf.Thickness(1), Margin = new Wpf.Thickness(0, 0, 10, 0) });
             line.Children.Add(new Controls.TextBlock { Text = ColorStore.Text(color), VerticalAlignment = Wpf.VerticalAlignment.Center,
                 FontFamily = new Media.FontFamily("Consolas") });
-            var row = new Controls.Button { Content = line, ToolTip = ColorStore.Hex(color) + " · " + ColorStore.Rgb(color) + "\nKopyalamak için tıkla" };
+            var row = new Controls.Button { Content = line, ToolTip = ColorStore.Hex(color) + " · " + ColorStore.Rgb(color) + Lang.T("\nKopyalamak için tıkla") };
             row.Click += (s, e) =>
             {
                 string report = Picker.Copy(color);
@@ -447,7 +447,7 @@ class ColorHistory
         }
         Get<Controls.TextBlock>("Empty").Visibility = all.Count == 0 ? Wpf.Visibility.Visible : Wpf.Visibility.Collapsed;
         Get<Controls.Button>("Clear").IsEnabled = all.Count > 0;
-        Get<Controls.Button>("Form").Content = "Biçim: " + (Prefs.CopyRgb ? "RGB" : "HEX");
+        Get<Controls.Button>("Form").Content = Lang.T("Biçim: ") + (Prefs.CopyRgb ? "RGB" : "HEX");
     }
 
 }

@@ -9,43 +9,6 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using PixelFormat = System.Drawing.Imaging.PixelFormat;
 
-// A system-wide keyboard shortcut: Win+Shift (or Alt alone) and a letter.
-class Hotkey : NativeWindow, IDisposable
-{
-    public const string QuickKeys = "Alt+Q"; // text from the screen, with one hand
-    public const string Keys = "Win+Shift+O"; // the same, for when another program owns Alt+Q
-    public const string TableKeys = "Alt+T"; // a table from the screen
-    public const string PinKeys = "Win+Shift+U"; // keep a window on top
-    public const string PasteKeys = "Win+Shift+Y"; // paste without formatting
-    public const string CaseKeys = "Win+Shift+B"; // change the case and paste
-    const int Message = 0x312;
-    const uint Alt = 1, Shift = 4, Win = 8, NoRepeat = 0x4000;
-    readonly Action pressed;
-    public readonly bool Works; // false when another program owns the shortcut
-    public readonly string Name;
-
-    // alt: Alt alone with the letter. AltGr (Ctrl+Alt) does not count, so Turkish AltGr+Q still types @.
-    public Hotkey(char letter, Action pressed, bool alt = false)
-    {
-        Name = (alt ? "Alt+" : "Win+Shift+") + letter;
-        this.pressed = pressed;
-        CreateHandle(new CreateParams());
-        Works = Native.RegisterHotKey(Handle, 1, (alt ? Alt : Win | Shift) | NoRepeat, letter);
-    }
-
-    protected override void WndProc(ref Message m)
-    {
-        if (m.Msg == Message) pressed();
-        else base.WndProc(ref m);
-    }
-
-    public void Dispose()
-    {
-        if (Works) Native.UnregisterHotKey(Handle, 1);
-        DestroyHandle();
-    }
-}
-
 // A window over all screens that shows them as they were a moment ago. Esc or switching away gives up.
 // It is created per-monitor DPI aware, so its pixels are the real pixels of every screen.
 abstract class ScreenOverlay : Form
@@ -77,7 +40,7 @@ abstract class ScreenOverlay : Form
                 open = false;
                 if (finished != null) finished();
                 Log.Error("ekran alınamadı", x);
-                MessageBox.Show("Ekran alınamadı: " + x.Message, "All In One");
+                MessageBox.Show(Lang.T("Ekran alınamadı: ") + x.Message, "All In One");
             }
             finally { Native.SetThreadDpiAwarenessContext(awareness); }
         };
@@ -166,7 +129,7 @@ class ScreenText : ScreenOverlay
     ScreenText(Rectangle screen, bool table) : base(screen)
     {
         this.table = table;
-        Text = table ? "All In One - ekrandan tablo" : "All In One - ekrandan metin";
+        Text = table ? Lang.T("All In One - ekrandan tablo") : Lang.T("All In One - ekrandan metin");
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -180,7 +143,7 @@ class ScreenText : ScreenOverlay
             g.DrawImage(Frozen, area, area, GraphicsUnit.Pixel);
             g.DrawRectangle(Pens.White, area.X, area.Y, area.Width - 1, area.Height - 1);
         }
-        Hint(g, (table ? "Tabloyu sürükleyerek seç" : "Metni alınacak alanı sürükle") + "  ·  Esc: vazgeç");
+        Hint(g, (table ? Lang.T("Tabloyu sürükleyerek seç") : Lang.T("Metni alınacak alanı sürükle")) + Lang.T("  ·  Esc: vazgeç"));
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
@@ -208,14 +171,14 @@ class ScreenText : ScreenOverlay
         Images.Start(() => { using (crop) return table ? RecognizeTable(crop) : Recognize(crop); });
     }
 
-    // Needs a single-threaded apartment for the clipboard.
-    public static Outcome RecognizeTable(Bitmap crop)
+    // A table is shown for checking before it is copied.
+    static Outcome RecognizeTable(Bitmap crop)
     {
-        var rows = TableText.Read(AsPicture(crop));
-        if (rows.Length == 0) return new Outcome { Text = "Seçilen alanda metin bulunamadı." };
-        Ocr.ToClipboard(TableText.Tsv(rows));
-        return new Outcome { Text = "Tablo panoya kopyalandı\n" + rows.Length + " satır, " + rows[0].Length
-            + " sütun · Excel'e yapıştır" };
+        var picture = AsPicture(crop);
+        var rows = TableText.Read(picture);
+        if (rows.Length == 0) return new Outcome { Text = Lang.T("Seçilen alanda metin bulunamadı.") };
+        App.Ui.BeginInvoke((Action)(() => TableWindow.Open(rows, picture.Pixels)));
+        return null;
     }
 
     // The rectangle between two points, kept on the picture.
@@ -230,7 +193,7 @@ class ScreenText : ScreenOverlay
     public static Outcome Recognize(Bitmap crop)
     {
         string text = Ocr.Read(AsPicture(crop), null);
-        if (string.IsNullOrWhiteSpace(text)) return new Outcome { Text = "Seçilen alanda metin bulunamadı." };
+        if (string.IsNullOrWhiteSpace(text)) return new Outcome { Text = Lang.T("Seçilen alanda metin bulunamadı.") };
         Ocr.ToClipboard(text);
         return Ocr.Copied(text.Split('\n')[0]);
     }

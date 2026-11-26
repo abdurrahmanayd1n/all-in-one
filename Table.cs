@@ -118,6 +118,14 @@ static class TableText
         return string.Join("\r\n", rows.Select(row => string.Join("\t", row.Select(Safe))));
     }
 
+    // A file for spreadsheets, apart by the separator of the user's region (";" in Turkey).
+    public static string Csv(string[][] rows, string separator)
+    {
+        return string.Join("\r\n", rows.Select(row => string.Join(separator, row.Select(Safe).Select(cell =>
+            cell.Contains(separator) || cell.IndexOfAny(new[] { '"', '\r', '\n' }) >= 0
+                ? "\"" + cell.Replace("\"", "\"\"") + "\"" : cell))));
+    }
+
     // Text read from the screen must not run as a formula when it is pasted; plain signed numbers stay as they are.
     static string Safe(string cell)
     {

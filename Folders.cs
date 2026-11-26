@@ -68,7 +68,7 @@ static class Folders
     public static void RenameContents(string[] folders)
     {
         var files = Contents(folders);
-        if (files.Length == 0) Images.Notify(new Outcome { Text = "Klasörün içinde adlandırılacak dosya yok." });
+        if (files.Length == 0) Images.Notify(new Outcome { Text = Lang.T("Klasörün içinde adlandırılacak dosya yok.") });
         else RenameWindow.Open(files);
     }
 
@@ -105,7 +105,7 @@ static class Folders
             if (inside.Length == 0) entries.Add(new Entry { Name = name + "/" });
             foreach (var item in inside)
             {
-                if (item is DirectoryInfo && IsLink(item)) problems.Add(item.FullName + ": bağlantı klasörü, atlandı");
+                if (item is DirectoryInfo && IsLink(item)) problems.Add(item.FullName + Lang.T(": bağlantı klasörü, atlandı"));
                 else Collect(item.FullName, name + "/" + item.Name, entries, problems);
             }
         }
@@ -117,7 +117,7 @@ static class Folders
     public static Outcome Zip(string[] items, string name, CompressionLevel level, Action<double> progress, Func<bool> cancelled,
         List<string> problems)
     {
-        if (!Packable(items)) throw new NotSupportedException("Bir sürücünün tamamı ZIP yapılamaz; içindeki klasörleri seç.");
+        if (!Packable(items)) throw new NotSupportedException(Lang.T("Bir sürücünün tamamı ZIP yapılamaz; içindeki klasörleri seç."));
         var entries = new List<Entry>();
         var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in items)
@@ -176,10 +176,10 @@ static class Folders
             if (!complete) File.Delete(target);
         }
         long size = new FileInfo(target).Length;
-        string text = Path.GetFileName(target) + "\n" + added + " dosya · " + Images.Size(size);
+        string text = Path.GetFileName(target) + "\n" + added + Lang.T(" dosya · ") + Images.Size(size);
         if (problems.Count > 0)
         {
-            text += " · " + problems.Count + " öğe eklenemedi";
+            text += " · " + problems.Count + Lang.T(" öğe eklenemedi");
             foreach (var problem in problems.Take(50)) Log.Error("ZIP'e eklenemedi: " + problem);
         }
         return new Outcome { File = target, Bytes = size, Text = text };
@@ -201,20 +201,20 @@ class ZipWindow
     {
         items = chosen;
         Assets.Dress(Window);
-        Window.Title = "ZIP Yap - " + (items.Length > 1 ? items.Length + " öğe" : Path.GetFileName(items[0]));
+        Window.Title = "ZIP Yap - " + (items.Length > 1 ? items.Length + Lang.T(" öğe") : Path.GetFileName(items[0]));
         Get<TextBlock>("Heading").Text = "ZIP Yap";
-        Get<TextBlock>("Details").Text = items.Length + " öğe";
+        Get<TextBlock>("Details").Text = items.Length + Lang.T(" öğe");
         Get<TextBlock>("Loading").Visibility = Visibility.Collapsed;
         Get<Grid>("Frame").Visibility = Visibility.Collapsed;
         Get<ScrollViewer>("RenameList").Visibility = Visibility.Visible;
         var rows = Get<StackPanel>("Rows");
         foreach (var item in items.Take(500))
-            rows.Children.Add(new TextBlock { Text = (Directory.Exists(item) ? "Klasör   " : "Dosya    ") + Path.GetFileName(item),
+            rows.Children.Add(new TextBlock { Text = (Directory.Exists(item) ? Lang.T("Klasör   ") : Lang.T("Dosya    ")) + Path.GetFileName(item),
                 Margin = new Thickness(0, 0, 0, 6), TextTrimming = TextTrimming.CharacterEllipsis });
 
         Get<StackPanel>("ZipLevelPanel").Visibility = Visibility.Visible;
-        foreach (var choice in new[] { Tuple.Create("Normal", CompressionLevel.Optimal), Tuple.Create("Hızlı", CompressionLevel.Fastest),
-            Tuple.Create("Sıkıştırmasız", CompressionLevel.NoCompression) })
+        foreach (var choice in new[] { Tuple.Create(Lang.T("Normal"), CompressionLevel.Optimal), Tuple.Create(Lang.T("Hızlı"), CompressionLevel.Fastest),
+            Tuple.Create(Lang.T("Sıkıştırmasız"), CompressionLevel.NoCompression) })
         {
             var value = choice.Item2;
             var chip = new RadioButton { Content = choice.Item1, GroupName = "level", IsChecked = value == level };
@@ -229,7 +229,7 @@ class ZipWindow
         use.IsChecked = Naming.UseSuffix;
         suffix.Text = Naming.Suffix;
         suffix.IsEnabled = use.IsChecked == true;
-        Get<TextBlock>("NameLabel").Text = "ZIP adı";
+        Get<TextBlock>("NameLabel").Text = Lang.T("ZIP adı");
         Get<TextBlock>("Extension").Text = ".zip";
         Action suggest = () =>
         {
@@ -252,7 +252,7 @@ class ZipWindow
         save.Content = "ZIP Yap";
         save.Click += (s, e) => Start();
         var close = Get<Button>("Cancel");
-        close.Content = "Kapat";
+        close.Content = Lang.T("Kapat");
         close.Click += (s, e) =>
         {
             if (running) cancel = true; // stops the work, the window stays
@@ -265,7 +265,7 @@ class ZipWindow
 
     string Problem()
     {
-        return !Folders.Packable(items) ? "Bir sürücünün tamamı ZIP yapılamaz; içindeki klasörleri seç."
+        return !Folders.Packable(items) ? Lang.T("Bir sürücünün tamamı ZIP yapılamaz; içindeki klasörleri seç.")
             : Naming.Problem(Get<TextBox>("NameBox").Text);
     }
 
@@ -289,10 +289,10 @@ class ZipWindow
         running = true;
         cancel = false;
         Get<Button>("Save").IsEnabled = false;
-        Get<Button>("Cancel").Content = "İptal";
+        Get<Button>("Cancel").Content = Lang.T("İptal");
         Get<ScrollViewer>("Settings").IsEnabled = false;
         Say("Error", null);
-        Say("Status", "Hazırlanıyor…");
+        Say("Status", Lang.T("Hazırlanıyor…"));
         var bar = Get<ProgressBar>("Progress");
         bar.Value = 0;
         bar.Visibility = Visibility.Visible;
@@ -315,7 +315,7 @@ class ZipWindow
                     {
                         if (!running) return;
                         bar.Value = p;
-                        Say("Status", "%" + percent);
+                        Say("Status", Lang.Percent(percent));
                     }));
                 }, () => cancel, problems);
             }
@@ -323,13 +323,13 @@ class ZipWindow
             catch (Exception e)
             {
                 Log.Error("ZIP: " + items[0], e);
-                failure = "ZIP yapılamadı: " + e.Message;
+                failure = Lang.T("ZIP yapılamadı: ") + e.Message;
             }
             Window.Dispatcher.BeginInvoke((Action)(() =>
             {
                 running = false;
                 Get<ScrollViewer>("Settings").IsEnabled = true;
-                Get<Button>("Cancel").Content = "Kapat";
+                Get<Button>("Cancel").Content = Lang.T("Kapat");
                 bar.Visibility = Visibility.Collapsed;
                 Say("Status", null);
                 if (outcome != null)
@@ -340,9 +340,9 @@ class ZipWindow
                 }
                 Validate();
                 if (outcome != null)
-                    Say("Error", "Arşiv eksik: " + problems.Count + " öğe eklenemedi.\n" + string.Join("\n", problems.Take(4)));
+                    Say("Error", Lang.T("Arşiv eksik: ") + problems.Count + Lang.T(" öğe eklenemedi.\n") + string.Join("\n", problems.Take(4)));
                 else if (failure != null) Say("Error", failure);
-                else Say("Status", "İptal edildi; yarım arşiv silindi.");
+                else Say("Status", Lang.T("İptal edildi; yarım arşiv silindi."));
             }));
         });
     }
@@ -369,8 +369,8 @@ class SizeWindow
     {
         folders = chosen;
         Assets.Dress(Window);
-        Window.Title = "Klasör Boyutu - " + (folders.Length > 1 ? folders.Length + " klasör" : folders[0]);
-        Get<TextBlock>("Heading").Text = "Klasör Boyutu";
+        Window.Title = Lang.T("Klasör Boyutu - ") + (folders.Length > 1 ? folders.Length + Lang.T(" klasör") : folders[0]);
+        Get<TextBlock>("Heading").Text = Lang.T("Klasör Boyutu");
         Get<ScrollViewer>("Settings").Visibility = Visibility.Collapsed;
         Get<TextBlock>("Loading").Visibility = Visibility.Collapsed;
         Get<Grid>("Frame").Visibility = Visibility.Collapsed;
@@ -378,17 +378,17 @@ class SizeWindow
         Get<TextBlock>("Details").TextWrapping = TextWrapping.Wrap;
 
         var reveal = Get<Button>("Save");
-        reveal.Content = "Klasörü aç";
+        reveal.Content = Lang.T("Klasörü aç");
         reveal.Click += (s, e) => OpenFolder(path.Count > 0 ? path.Peek().Path : folders[0]);
         var up = Get<Button>("Extra");
-        up.Content = "Yukarı";
+        up.Content = Lang.T("Yukarı");
         up.Visibility = Visibility.Visible;
         up.Click += (s, e) =>
         {
             path.Pop();
             Show();
         };
-        Get<Button>("Cancel").Content = "Kapat";
+        Get<Button>("Cancel").Content = Lang.T("Kapat");
         Get<Button>("Cancel").Click += (s, e) => Window.Close();
         Window.Closed += (s, e) => cancel = true;
         Window.Loaded += (s, e) => Scan();
@@ -397,7 +397,7 @@ class SizeWindow
     void Scan()
     {
         scanning = true;
-        Get<TextBlock>("Details").Text = "Taranıyor…";
+        Get<TextBlock>("Details").Text = Lang.T("Taranıyor…");
         Images.Background(() =>
         {
             int count = 0;
@@ -414,7 +414,7 @@ class SizeWindow
                         int so = count;
                         Window.Dispatcher.BeginInvoke((Action)(() =>
                         {
-                            if (scanning) Get<TextBlock>("Details").Text = "Taranıyor… " + so + " klasör";
+                            if (scanning) Get<TextBlock>("Details").Text = Lang.T("Taranıyor… ") + so + Lang.T(" klasör");
                         }));
                     }, () => cancel));
             }
@@ -455,17 +455,17 @@ class SizeWindow
         rows.Children.Clear();
         foreach (var line in lines.Take(Shown)) rows.Children.Add(Row(line.Item1, line.Item2, total, largest, line.Item3));
         if (lines.Count > Shown)
-            rows.Children.Add(new TextBlock { Text = "… ve " + (lines.Count - Shown) + " küçük öğe daha", Foreground = Brushes.Gray });
-        if (lines.Count == 0) rows.Children.Add(new TextBlock { Text = "Klasör boş.", Foreground = Brushes.Gray });
+            rows.Children.Add(new TextBlock { Text = Lang.T("… ve ") + (lines.Count - Shown) + Lang.T(" küçük öğe daha"), Foreground = Brushes.Gray });
+        if (lines.Count == 0) rows.Children.Add(new TextBlock { Text = Lang.T("Klasör boş."), Foreground = Brushes.Gray });
         ((ScrollViewer)Get<ScrollViewer>("RenameList")).ScrollToTop();
 
         int files = here != null ? here.Files : roots.Sum(r => r.Files);
         int inside = here != null ? here.Folders : roots.Sum(r => r.Folders);
         int unread = here != null ? here.Unread : roots.Sum(r => r.Unread);
-        Get<TextBlock>("Details").Text = (here != null ? here.Path : roots.Count + " klasör") + "\n\nToplam " + Images.Size(total)
-            + "\n" + files + " dosya · " + inside + " alt klasör"
-            + (unread > 0 ? "\n" + unread + " klasör okunamadı (izin yok); toplama girmedi." : "")
-            + "\n\nİçine girmek için soldaki bir klasöre tıkla.";
+        Get<TextBlock>("Details").Text = (here != null ? here.Path : roots.Count + Lang.T(" klasör")) + "\n\nToplam " + Images.Size(total)
+            + "\n" + files + Lang.T(" dosya · ") + inside + Lang.T(" alt klasör")
+            + (unread > 0 ? "\n" + unread + Lang.T(" klasör okunamadı (izin yok); toplama girmedi.") : "")
+            + Lang.T("\n\nİçine girmek için soldaki bir klasöre tıkla.");
         Get<Button>("Extra").IsEnabled = path.Count > (roots.Count == 1 ? 1 : 0);
     }
 
@@ -488,7 +488,7 @@ class SizeWindow
         };
         cell((folder != null ? "▸  " : "     ") + name, 0, folder != null ? "#F2F3F5" : "#C4C6CE");
         cell(bytes == 0 ? "0 KB" : Images.Size(bytes), 1, "#F2F3F5");
-        cell("%" + (total > 0 ? (int)Math.Round(bytes * 100.0 / total) : 0), 2, "#A6A9B4");
+        cell(Lang.Percent(total > 0 ? (int)Math.Round(bytes * 100.0 / total) : 0), 2, "#A6A9B4");
         var bar = new Grid { Height = 3, Margin = new Thickness(0, 4, 0, 0) };
         double share = Math.Max(0.002, (double)bytes / largest);
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(share, GridUnitType.Star) });

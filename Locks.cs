@@ -79,8 +79,8 @@ static class FileUsers
         long started = ((long)info.Process.Started.dwHighDateTime << 32) | (uint)info.Process.Started.dwLowDateTime;
         var holder = new Holder { Id = info.Process.Id, Type = info.Type, Started = DateTime.FromFileTime(started),
             Name = info.AppName, Exe = "",
-            Kind = info.Type == 3 ? "Windows hizmeti" : info.Type == 4 ? "Windows Gezgini" : info.Type == 5 ? "komut penceresi"
-                : info.Type == 1000 ? "kritik sistem işlemi" : "program" };
+            Kind = info.Type == 3 ? Lang.T("Windows hizmeti") : info.Type == 4 ? Lang.T("Windows Gezgini") : info.Type == 5 ? "komut penceresi"
+                : info.Type == 1000 ? Lang.T("kritik sistem işlemi") : "program" };
         try
         {
             using (var process = Process.GetProcessById(info.Process.Id))
@@ -115,16 +115,16 @@ static class FileUsers
     // Why this program is not closed from here, or null when it may be.
     public static string WhyNot(Holder holder)
     {
-        if (holder.Id == Process.GetCurrentProcess().Id) return "Bu, All In One'ın kendisi.";
-        if (holder.Type == 4) return "Windows Gezgini buradan kapatılmaz: ilgili klasör penceresini veya önizleme bölmesini kapat.";
-        if (holder.Type == 3) return "Windows hizmetleri buradan kapatılmaz.";
+        if (holder.Id == Process.GetCurrentProcess().Id) return Lang.T("Bu, All In One'ın kendisi.");
+        if (holder.Type == 4) return Lang.T("Windows Gezgini buradan kapatılmaz: ilgili klasör penceresini veya önizleme bölmesini kapat.");
+        if (holder.Type == 3) return Lang.T("Windows hizmetleri buradan kapatılmaz.");
         bool vital = holder.Type == 1000 || holder.Id <= 4;
         try
         {
             using (var process = Running(holder)) vital |= process != null && Vital.Contains(process.ProcessName.ToLowerInvariant());
         }
-        catch (Exception) { return "Windows bu programa erişime izin vermiyor (yönetici olarak çalışıyor olabilir)."; }
-        return vital ? "Sistem için gerekli bir işlem; kapatılmaz." : null;
+        catch (Exception) { return Lang.T("Windows bu programa erişime izin vermiyor (yönetici olarak çalışıyor olabilir)."); }
+        return vital ? Lang.T("Sistem için gerekli bir işlem; kapatılmaz.") : null;
     }
 
     public static bool HasWindow(Holder holder)
@@ -148,13 +148,13 @@ static class FileUsers
             {
                 if (process == null) return null;
                 if (force) process.Kill();
-                else if (!process.CloseMainWindow()) return "Programın kapatılacak bir penceresi yok.";
+                else if (!process.CloseMainWindow()) return Lang.T("Programın kapatılacak bir penceresi yok.");
                 return process.WaitForExit(patience) ? null
-                    : "Program hâlâ açık. Kaydetmek isteyip istemediğini soruyor olabilir; penceresine bak.";
+                    : Lang.T("Program hâlâ açık. Kaydetmek isteyip istemediğini soruyor olabilir; penceresine bak.");
             }
         }
         catch (InvalidOperationException) { return null; } // it ended in the same instant
-        catch (Exception e) { return "Kapatılamadı: " + e.Message; }
+        catch (Exception e) { return Lang.T("Kapatılamadı: ") + e.Message; }
     }
 
     // Whether the file refuses to be opened alone, even if no holder can be named.
@@ -179,7 +179,7 @@ class UsersWindow
 
     // Asks before a program is ended without a chance to save; the test replaces it.
     public static Func<Window, string, bool> Confirm = (owner, name) => MessageBox.Show(owner,
-        name + " hemen sonlandırılacak.\n\nKaydedilmemiş çalışma kaybolur. Devam edilsin mi?", "Zorla kapat",
+        name + Lang.T(" hemen sonlandırılacak.\n\nKaydedilmemiş çalışma kaybolur. Devam edilsin mi?"), Lang.T("Zorla kapat"),
         MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
 
     T Get<T>(string name) where T : class { return (T)Window.FindName(name); }
@@ -188,17 +188,17 @@ class UsersWindow
     {
         files = chosen;
         Assets.Dress(Window);
-        Window.Title = "Kim Kullanıyor? - " + (files.Length > 1 ? files.Length + " dosya" : Path.GetFileName(files[0]));
-        Get<TextBlock>("Heading").Text = "Kim Kullanıyor?";
+        Window.Title = Lang.T("Kim Kullanıyor? - ") + (files.Length > 1 ? files.Length + Lang.T(" dosya") : Path.GetFileName(files[0]));
+        Get<TextBlock>("Heading").Text = Lang.T("Kim Kullanıyor?");
         Get<ScrollViewer>("Settings").Visibility = Visibility.Collapsed;
         Get<TextBlock>("Loading").Visibility = Visibility.Collapsed;
         Get<Grid>("Frame").Visibility = Visibility.Collapsed;
         Get<ScrollViewer>("RenameList").Visibility = Visibility.Visible;
         Get<TextBlock>("Details").TextWrapping = TextWrapping.Wrap;
         var again = Get<Button>("Save");
-        again.Content = "Yenile";
+        again.Content = Lang.T("Yenile");
         again.Click += (s, e) => Look();
-        Get<Button>("Cancel").Content = "Kapat";
+        Get<Button>("Cancel").Content = Lang.T("Kapat");
         Get<Button>("Cancel").Click += (s, e) => Window.Close();
         Window.Loaded += (s, e) => Look();
     }
@@ -213,7 +213,7 @@ class UsersWindow
     void Look()
     {
         if (busy) return;
-        Busy("Bakılıyor…");
+        Busy(Lang.T("Bakılıyor…"));
         Images.Background(() =>
         {
             var findings = files.Take(Most).Select(file =>
@@ -221,14 +221,14 @@ class UsersWindow
                 var finding = new Finding { File = file };
                 try
                 {
-                    if (!File.Exists(file)) finding.Problem = "Dosya artık yok.";
+                    if (!File.Exists(file)) finding.Problem = Lang.T("Dosya artık yok.");
                     else
                     {
                         finding.Holders = FileUsers.Of(file);
                         finding.Locked = finding.Holders.Count == 0 && FileUsers.Locked(file);
                     }
                 }
-                catch (Exception e) { finding.Problem = "Sorulamadı: " + e.Message; }
+                catch (Exception e) { finding.Problem = Lang.T("Sorulamadı: ") + e.Message; }
                 return finding;
             }).ToList();
             Window.Dispatcher.BeginInvoke((Action)(() =>
@@ -256,7 +256,7 @@ class UsersWindow
     void End(Holder holder, bool force)
     {
         if (busy || (force && !Confirm(Window, holder.Name))) return;
-        Busy(holder.Name + " kapatılıyor…");
+        Busy(holder.Name + Lang.T(" kapatılıyor…"));
         Images.Background(() =>
         {
             string failed = FileUsers.End(holder, force);
@@ -286,8 +286,8 @@ class UsersWindow
             button.Click += (s, e) => End(holder, force);
             buttons.Children.Add(button);
         };
-        if (FileUsers.HasWindow(holder)) add("Programı kapat", "Pencerenin kapatma düğmesi gibi: program kaydetmeyi sorabilir", false);
-        add("Zorla kapat", "Hemen sonlandırır; kaydedilmemiş çalışma kaybolur", true);
+        if (FileUsers.HasWindow(holder)) add(Lang.T("Programı kapat"), Lang.T("Pencerenin kapatma düğmesi gibi: program kaydetmeyi sorabilir"), false);
+        add(Lang.T("Zorla kapat"), Lang.T("Hemen sonlandırır; kaydedilmemiş çalışma kaybolur"), true);
         rows.Children.Add(buttons);
     }
 
@@ -301,22 +301,22 @@ class UsersWindow
             Line(rows, Path.GetFileName(finding.File), "#F2F3F5", 14, 0, true);
             if (finding.Problem != null) Line(rows, finding.Problem, "#FF8A80", 12.5, 12, false);
             else if (finding.Locked)
-                Line(rows, "Kilitli, ama tutan program görünmüyor. Yönetici olarak çalışan bir program veya antivirüs olabilir.",
+                Line(rows, Lang.T("Kilitli, ama tutan program görünmüyor. Yönetici olarak çalışan bir program veya antivirüs olabilir."),
                     "#FFB86B", 12.5, 12, false);
-            else if (finding.Holders.Count == 0) Line(rows, "Hiçbir program tutmuyor.", "#7EE2A8", 12.5, 12, false);
+            else if (finding.Holders.Count == 0) Line(rows, Lang.T("Hiçbir program tutmuyor."), "#7EE2A8", 12.5, 12, false);
             foreach (var holder in finding.Holders)
             {
-                Line(rows, holder.Name + "  ·  " + holder.Kind + "  ·  işlem " + holder.Id, "#FFB86B", 13, 12, false);
+                Line(rows, holder.Name + "  ·  " + holder.Kind + Lang.T("  ·  işlem ") + holder.Id, "#FFB86B", 13, 12, false);
                 if (holder.Exe != "") Line(rows, holder.Exe, "#A6A9B4", 11.5, 12, false);
                 Controls(rows, holder);
             }
             rows.Children.Add(new Border { Height = 14 });
         }
         int used = findings.Count(f => f.Holders.Count > 0 || f.Locked);
-        Get<TextBlock>("Details").Text = (used == 0 ? "Seçilen dosyaları tutan program bulunamadı."
-            : used + " dosya kullanımda. Programı soldan veya kendi penceresinden kapat.")
-            + (files.Length > Most ? "\nİlk " + Most + " dosyaya bakıldı." : "")
-            + "\n\nBazı programlar dosyayı okuyup hemen bırakır; açık görünseler de listede çıkmazlar.";
+        Get<TextBlock>("Details").Text = (used == 0 ? Lang.T("Seçilen dosyaları tutan program bulunamadı.")
+            : used + Lang.T(" dosya kullanımda. Programı soldan veya kendi penceresinden kapat."))
+            + (files.Length > Most ? Lang.T("\nİlk ") + Most + Lang.T(" dosyaya bakıldı.") : "")
+            + Lang.T("\n\nBazı programlar dosyayı okuyup hemen bırakır; açık görünseler de listede çıkmazlar.");
     }
 
     static void Line(Panel rows, string text, string color, double size, double indent, bool bold)

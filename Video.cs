@@ -1,4 +1,5 @@
-// Video tools through FFmpeg: compress, make a GIF, take the sound out. Originals are never modified or overwritten.
+// Video tools through FFmpeg: compress, make a GIF, take the sound out, cut a part out, join several. Originals
+// are never modified or overwritten.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -9,7 +10,7 @@ using System.Text;
 using System.Windows.Media.Imaging;
 using Path = System.IO.Path;
 
-enum VideoTask { Compress, Gif, Audio }
+enum VideoTask { Compress, Gif, Audio, Trim, Merge }
 
 class VideoJob
 {
@@ -22,16 +23,33 @@ class VideoJob
     public int Width = 480, Rate = 15; // Width 0: as it is
     // Audio
     public string AudioExt = ".mp3";
+    // Trim uses Start and this; 0: to the end. Exact: encoded anew, so that it begins on the very frame asked for.
+    public double End;
+    public bool Exact;
 
-    public string Extension { get { return Task == VideoTask.Compress ? ".mp4" : Task == VideoTask.Gif ? ".gif" : AudioExt; } }
+    public string Extension { get { return Task == VideoTask.Gif ? ".gif" : Task == VideoTask.Audio ? AudioExt : ".mp4"; } }
 
-    public string Suffix { get { return Task == VideoTask.Compress ? "_sikistirilmis" : Task == VideoTask.Gif ? "_gif" : "_ses"; } }
+    // A part copied without encoding stays in the kind of file it came from.
+    public string ExtensionFor(string input)
+    {
+        return Task == VideoTask.Trim && !Exact ? Path.GetExtension(input).ToLowerInvariant() : Extension;
+    }
+
+    public string Suffix
+    {
+        get
+        {
+            return Task == VideoTask.Compress ? "_sikistirilmis" : Task == VideoTask.Gif ? "_gif" : Task == VideoTask.Audio ? "_ses"
+                : Task == VideoTask.Trim ? "_kesit" : "_birlestirilmis";
+        }
+    }
 }
 
 class VideoInfo
 {
     public double Seconds;
     public int Width, Height; // as shown, so a phone's rotation is already counted
+    public bool Turned; // the file carries a rotation
     public string VideoCodec, AudioCodec; // null: there is none
 
     public string Describe
@@ -39,7 +57,7 @@ class VideoInfo
         get
         {
             return (VideoCodec == null ? "" : Width + " × " + Height + " · ") + Video.Clock(Seconds)
-                + " · " + (VideoCodec ?? "görüntü yok") + (AudioCodec == null ? " · sessiz" : " / " + AudioCodec);
+                + " · " + (VideoCodec ?? Lang.T("görüntü yok")) + (AudioCodec == null ? Lang.T(" · sessiz") : " / " + AudioCodec);
         }
     }
 }
@@ -102,14 +120,14 @@ static class Video
             var errors = process.StandardError.ReadToEndAsync();
             string output = process.StandardOutput.ReadToEnd();
             process.WaitForExit();
-            if (process.ExitCode != 0) throw new IOException("Video okunamadı: " + errors.Result.Trim());
+            if (process.ExitCode != 0) throw new IOException(Lang.T("Video okunamadı: ") + errors.Result.Trim());
             return output;
         }
     }
 
     public static VideoInfo Probe(string path)
     {
-        if (!Available) throw new NotSupportedException("Video için FFmpeg bulunamadı.");
+        if (!Available) throw new NotSupportedException(Lang.T("Video için FFmpeg bulunamadı."));
         var info = new VideoInfo();
         string video = Ask("-v error -select_streams V:0 -show_entries stream=codec_name,width,height:stream_side_data=rotation"
             + ":format=duration -of default=noprint_wrappers=1 \"" + path + "\"");
@@ -122,6 +140,7 @@ static class Video
             else if (line[0] == "rotation") int.TryParse(line[1], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out rotation);
             else if (line[0] == "duration") double.TryParse(line[1], NumberStyles.Float, CultureInfo.InvariantCulture, out info.Seconds);
         }
+        info.Turned = rotation % 360 != 0;
         if (Math.Abs(rotation) % 180 == 90) { int w = info.Width; info.Width = info.Height; info.Height = w; }
         string audio = Ask("-v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 \""
             + path + "\"").Trim();
@@ -149,6 +168,8 @@ static class Video
     // How long the part that gets processed is.
     public static double Span(VideoJob job, VideoInfo info)
     {
+        if (job.Task == VideoTask.Trim)
+            return Math.Max(0, (job.End > 0 && (info.Seconds <= 0 || job.End < info.Seconds) ? job.End : info.Seconds) - job.Start);
         if (job.Task != VideoTask.Gif) return info.Seconds;
         double rest = Math.Max(0, info.Seconds - job.Start);
         return job.Length > 0 && (info.Seconds <= 0 || job.Length < rest) ? job.Length : rest;
@@ -157,22 +178,30 @@ static class Video
     // The picture and sound bit rates, in kbit/s, that keep a video under the target size.
     public static void Rates(int targetMb, double seconds, bool sound, out int picture, out int audio)
     {
-        if (seconds <= 0) throw new NotSupportedException("Videonun süresi okunamadığı için hedef boyut hesaplanamıyor.");
+        if (seconds <= 0) throw new NotSupportedException(Lang.T("Videonun süresi okunamadığı için hedef boyut hesaplanamıyor."));
         double total = targetMb * 8192.0 * 0.95 / seconds; // 5% for the container and the encoder's drift
         audio = !sound ? 0 : total > 600 ? 128 : 64;
         picture = (int)Math.Min(100000, total - audio);
         if (picture < 50)
-            throw new NotSupportedException("Bu uzunlukta video için hedef çok küçük; en az "
-                + Math.Ceiling((50 + audio) * seconds / (8192 * 0.95)) + " MB gerekir.");
+            throw new NotSupportedException(Lang.T("Bu uzunlukta video için hedef çok küçük; en az ")
+                + Math.Ceiling((50 + audio) * seconds / (8192 * 0.95)) + Lang.T(" MB gerekir."));
     }
 
     // The FFmpeg arguments of one pass; pass 0 means a single pass.
     public static string Arguments(VideoJob job, VideoInfo info, string input, string output, int pass, string log)
     {
         var a = new StringBuilder("-hide_banner -nostdin -v error -y -progress pipe:1 -nostats");
-        if (job.Task == VideoTask.Gif && job.Start > 0) a.Append(" -ss " + Number(job.Start));
+        if ((job.Task == VideoTask.Gif || job.Task == VideoTask.Trim) && job.Start > 0) a.Append(" -ss " + Number(job.Start));
         a.Append(" -i \"" + input + "\"");
-        if (job.Task == VideoTask.Gif)
+        if (job.Task == VideoTask.Trim)
+        {
+            if (job.End > 0) a.Append(" -t " + Number(Math.Max(0, job.End - job.Start)));
+            // Copying is instant and loses nothing, but can only begin at a key frame, so a little earlier.
+            a.Append(" -map 0:V:0? -map 0:a? -sn -dn");
+            a.Append(job.Exact ? " -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -vf \"scale=trunc(iw/2)*2:trunc(ih/2)*2\""
+                + " -c:a aac -b:a 192k -movflags +faststart" : " -c copy -avoid_negative_ts make_zero");
+        }
+        else if (job.Task == VideoTask.Gif)
         {
             if (job.Length > 0) a.Append(" -t " + Number(job.Length));
             string width = job.Width > 0 ? "scale='min(" + job.Width + ",iw)':-1:flags=lanczos," : "";
@@ -233,7 +262,7 @@ static class Video
                     throw new OperationCanceledException();
                 }
             process.WaitForExit(); // lets the last lines arrive
-            if (process.ExitCode != 0) throw new IOException("FFmpeg hata verdi: " + errors.ToString().Trim());
+            if (process.ExitCode != 0) throw new IOException(Lang.T("FFmpeg hata verdi: ") + errors.ToString().Trim());
         }
     }
 
@@ -243,16 +272,18 @@ static class Video
         string problem = Naming.Problem(name);
         if (problem != null) throw new ArgumentException(problem);
         var info = Probe(input);
-        if (job.Task == VideoTask.Audio && info.AudioCodec == null) return new Outcome { Text = "Bu videoda ses yok." };
-        if (job.Task != VideoTask.Audio && info.VideoCodec == null) throw new NotSupportedException("Dosyada görüntü bulunamadı.");
+        if (job.Task == VideoTask.Audio && info.AudioCodec == null) return new Outcome { Text = Lang.T("Bu videoda ses yok.") };
+        if (job.Task != VideoTask.Audio && info.VideoCodec == null) throw new NotSupportedException(Lang.T("Dosyada görüntü bulunamadı."));
         long before = new FileInfo(input).Length;
         bool targeted = job.Task == VideoTask.Compress && job.TargetMb > 0;
-        if (targeted && before <= job.TargetMb * 1048576L) return new Outcome { Text = "Dosya zaten " + job.TargetMb + " MB altında." };
-        if (job.Task == VideoTask.Gif && info.Seconds > 0 && job.Start >= info.Seconds)
-            throw new ArgumentException("Başlangıç videonun süresinden (" + Clock(info.Seconds) + ") sonra.");
+        if (targeted && before <= job.TargetMb * 1048576L) return new Outcome { Text = Lang.T("Dosya zaten ") + job.TargetMb + Lang.T(" MB altında.") };
+        if ((job.Task == VideoTask.Gif || job.Task == VideoTask.Trim) && info.Seconds > 0 && job.Start >= info.Seconds)
+            throw new ArgumentException(Lang.T("Başlangıç videonun süresinden (") + Clock(info.Seconds) + Lang.T(") sonra."));
+        if (job.Task == VideoTask.Trim && job.End > 0 && job.End <= job.Start)
+            throw new ArgumentException(Lang.T("Bitiş başlangıçtan sonra olmalı."));
 
-        string folder = Path.GetDirectoryName(input), id = Guid.NewGuid().ToString("N");
-        string temp = Path.Combine(folder, "~aio-" + id + job.Extension), log = Path.Combine(Path.GetTempPath(), "AllInOne-" + id);
+        string folder = Path.GetDirectoryName(input), id = Guid.NewGuid().ToString("N"), ext = job.ExtensionFor(input);
+        string temp = Path.Combine(folder, "~aio-" + id + ext), log = Path.Combine(Path.GetTempPath(), "AllInOne-" + id);
         try
         {
             double span = Span(job, info);
@@ -264,19 +295,99 @@ static class Video
             else Encode(Arguments(job, info, input, temp, 0, log), span, progress, cancelled);
 
             long after = new FileInfo(temp).Length;
-            if (after == 0) throw new IOException("FFmpeg boş dosya üretti.");
+            if (after == 0) throw new IOException(Lang.T("FFmpeg boş dosya üretti."));
             if (job.Task == VideoTask.Compress && after >= before)
-                return new Outcome { Text = "Video küçülmediği için kaydedilmedi. Daha düşük kalite veya çözünürlük dene." };
-            string target = Move(temp, folder, name, job.Extension);
+                return new Outcome { Text = Lang.T("Video küçülmediği için kaydedilmedi. Daha düşük kalite veya çözünürlük dene.") };
+            string target = Move(temp, folder, name, ext);
             string text = Path.GetFileName(target) + "\n" + (job.Task == VideoTask.Compress
                 ? Images.Size(before) + " → " + Images.Size(after) + " · " + Images.Difference(before, after) : Images.Size(after));
-            if (targeted && after > job.TargetMb * 1048576L) text += " · hedefi biraz aştı";
+            if (targeted && after > job.TargetMb * 1048576L) text += Lang.T(" · hedefi biraz aştı");
             return new Outcome { File = target, Bytes = after, Text = text };
         }
         finally
         {
             File.Delete(temp);
             foreach (string left in new[] { "-0.log", "-0.log.mbtree", "-0.log.temp", "-0.log.mbtree.temp" }) File.Delete(log + left);
+        }
+    }
+
+    // Videos made alike (same kind of file, picture and sound) are joined as they are; others are encoded anew.
+    public static bool Alike(string[] inputs, VideoInfo[] all)
+    {
+        return inputs.Select(i => Path.GetExtension(i).ToLowerInvariant()).Distinct().Count() == 1
+            && all.Select(i => i.VideoCodec + " " + i.AudioCodec + " " + i.Width + "x" + i.Height + " " + i.Turned).Distinct().Count() == 1;
+    }
+
+    // The list file that names the videos to be copied one after another.
+    public static string List(string[] inputs)
+    {
+        return string.Concat(inputs.Select(i => "file '" + i.Replace("'", @"'\''") + "'\n"));
+    }
+
+    // Every picture is fitted into the first one's size and every sound into one form; a video without sound
+    // gets silence.
+    public static string Joining(string[] inputs, VideoInfo[] all, string output)
+    {
+        var a = new StringBuilder("-hide_banner -nostdin -v error -y -progress pipe:1 -nostats");
+        foreach (var input in inputs) a.Append(" -i \"" + input + "\"");
+        bool sound = all.Any(i => i.AudioCodec != null);
+        var silent = new int[all.Length]; // the extra input that stands in for a missing sound
+        for (int i = 0, next = all.Length; i < all.Length; i++)
+            if (sound && all[i].AudioCodec == null)
+            {
+                a.Append(" -f lavfi -t " + Number(all[i].Seconds) + " -i anullsrc=r=48000:cl=stereo");
+                silent[i] = next++;
+            }
+        string w = (all[0].Width / 2 * 2).ToString(), h = (all[0].Height / 2 * 2).ToString();
+        var graph = new StringBuilder();
+        var joined = new StringBuilder();
+        for (int i = 0; i < all.Length; i++)
+        {
+            graph.Append("[" + i + ":V:0]scale=" + w + ":" + h + ":force_original_aspect_ratio=decrease,pad=" + w + ":" + h
+                + ":(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v" + i + "];");
+            joined.Append("[v" + i + "]");
+            if (!sound) continue;
+            graph.Append("[" + (all[i].AudioCodec == null ? silent[i] : i) + ":a:0]aresample=48000,aformat=channel_layouts=stereo[a"
+                + i + "];");
+            joined.Append("[a" + i + "]");
+        }
+        graph.Append(joined + "concat=n=" + all.Length + ":v=1:a=" + (sound ? "1[v][a]" : "0[v]"));
+        a.Append(" -filter_complex \"" + graph + "\" -map \"[v]\"" + (sound ? " -map \"[a]\" -c:a aac -b:a 192k" : ""));
+        return a.Append(" -c:v libx264 -preset medium -crf 20 -movflags +faststart \"" + output + "\"").ToString();
+    }
+
+    // Joins the videos in this order into one new file next to the first.
+    public static Outcome Merge(string[] inputs, string name, Action<double> progress, Func<bool> cancelled)
+    {
+        string problem = Naming.Problem(name);
+        if (problem != null) throw new ArgumentException(problem);
+        if (inputs.Length < 2) throw new ArgumentException(Lang.T("Birleştirmek için en az iki video gerekli."));
+        var all = inputs.Select(Probe).ToArray();
+        if (all.Any(i => i.VideoCodec == null)) throw new NotSupportedException(Lang.T("Dosyada görüntü bulunamadı."));
+        bool copy = Alike(inputs, all);
+        string folder = Path.GetDirectoryName(inputs[0]), id = Guid.NewGuid().ToString("N");
+        string ext = copy ? Path.GetExtension(inputs[0]).ToLowerInvariant() : ".mp4";
+        string temp = Path.Combine(folder, "~aio-" + id + ext), list = Path.Combine(Path.GetTempPath(), "AllInOne-" + id + ".txt");
+        try
+        {
+            double seconds = all.Sum(i => i.Seconds);
+            if (copy)
+            {
+                File.WriteAllText(list, List(inputs), new UTF8Encoding(false));
+                Encode("-hide_banner -nostdin -v error -y -progress pipe:1 -nostats -f concat -safe 0 -i \"" + list
+                    + "\" -map 0:V:0 -map 0:a? -c copy \"" + temp + "\"", seconds, progress, cancelled);
+            }
+            else Encode(Joining(inputs, all, temp), seconds, progress, cancelled);
+            long after = new FileInfo(temp).Length;
+            if (after == 0) throw new IOException(Lang.T("FFmpeg boş dosya üretti."));
+            string target = Move(temp, folder, name, ext);
+            return new Outcome { File = target, Bytes = after, Text = Path.GetFileName(target) + "\n" + inputs.Length
+                + Lang.T(" video · ") + Images.Size(after) + (copy ? Lang.T(" · kalite kaybı yok") : "") };
+        }
+        finally
+        {
+            File.Delete(temp);
+            File.Delete(list);
         }
     }
 

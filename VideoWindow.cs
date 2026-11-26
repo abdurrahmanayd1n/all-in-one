@@ -18,29 +18,32 @@ class VideoWindow
     bool running, nameEdited, syncing;
     volatile bool cancel;
 
-    bool Many { get { return paths.Length > 1; } }
+    bool Joins { get { return Job.Task == VideoTask.Merge; } }
+    bool Many { get { return paths.Length > 1 && !Joins; } } // a batch: one result for each file
 
     T Get<T>(string name) where T : class { return (T)Window.FindName(name); }
 
     // preset: the values the window starts with. start: begin at once (the one-click options of the menu).
     public VideoWindow(string[] files, VideoJob preset, bool start)
     {
-        paths = files;
+        paths = (string[])files.Clone(); // joining changes the order
         Job = preset;
         Assets.Dress(Window);
-        string title = Job.Task == VideoTask.Compress ? "Video Sıkıştır" : Job.Task == VideoTask.Gif ? "GIF Yap" : "Sesi Ayır";
-        Window.Title = title + " - " + (Many ? paths.Length + " video" : Path.GetFileName(paths[0]));
+        string title = Job.Task == VideoTask.Compress ? Lang.T("Video Sıkıştır") : Job.Task == VideoTask.Gif ? Lang.T("GIF Yap")
+            : Job.Task == VideoTask.Audio ? Lang.T("Sesi Ayır") : Job.Task == VideoTask.Trim ? Lang.T("Video Kes") : Lang.T("Video Birleştir");
+        Window.Title = title + " - " + (paths.Length > 1 ? paths.Length + Lang.T(" video") : Path.GetFileName(paths[0]));
         Get<TextBlock>("Heading").Text = title;
         Get<Canvas>("Selection").Visibility = Visibility.Collapsed;
         if (Many) Assets.Strip(Window, paths, Pick);
         SetUpPanels();
         SetUpNaming();
+        if (Joins) Assets.Order(Window, paths, Pick, UpdateName);
 
         var save = Get<Button>("Save");
-        save.Content = "Başlat";
+        save.Content = Lang.T("Başlat");
         save.Click += (s, e) => Start();
         var close = Get<Button>("Cancel");
-        close.Content = "Kapat";
+        close.Content = Lang.T("Kapat");
         close.Click += (s, e) =>
         {
             if (running) cancel = true; // stops the work, the window stays
@@ -72,8 +75,21 @@ class VideoWindow
 
     void SetUpPanels()
     {
-        Get<StackPanel>(Job.Task == VideoTask.Compress ? "VideoCompressPanel" : Job.Task == VideoTask.Gif ? "VideoGifPanel"
-            : "VideoAudioPanel").Visibility = Visibility.Visible;
+        string panel = Job.Task == VideoTask.Compress ? "VideoCompressPanel" : Job.Task == VideoTask.Gif ? "VideoGifPanel"
+            : Job.Task == VideoTask.Audio ? "VideoAudioPanel" : Job.Task == VideoTask.Trim ? "VideoTrimPanel" : null;
+        if (panel != null) Get<StackPanel>(panel).Visibility = Visibility.Visible;
+
+        var begin = Get<TextBox>("TrimStartBox");
+        var end = Get<TextBox>("TrimEndBox");
+        begin.Text = Job.Start.ToString("0.###");
+        end.Text = Job.End.ToString("0.###");
+        begin.TextChanged += (s, e) => { Validate(); debounce.Stop(); debounce.Start(); };
+        end.TextChanged += (s, e) => Validate();
+        Chips("TrimChips", "tr", Job.Exact, value =>
+        {
+            Job.Exact = value;
+            Get<TextBlock>("Extension").Text = Job.ExtensionFor(paths[0]);
+        }, Choice(Lang.T("Hızlı"), false), Choice(Lang.T("Hassas"), true));
 
         // 0 stands for "aim at a size".
         Chips("VideoQualityChips", "vq", Job.TargetMb > 0 ? 0 : Job.Crf, value =>
@@ -82,7 +98,7 @@ class VideoWindow
             if (value != 0) Job.Crf = value;
             Job.TargetMb = value == 0 ? 1 : 0;
             Validate();
-        }, Choice("Yüksek", 23), Choice("Orta", 28), Choice("Küçük", 33), Choice("Hedef boyut", 0));
+        }, Choice(Lang.T("Yüksek"), 23), Choice(Lang.T("Orta"), 28), Choice(Lang.T("Küçük"), 33), Choice(Lang.T("Hedef boyut"), 0));
         var targetBox = Get<TextBox>("VideoTargetBox");
         if (Job.TargetMb > 0)
         {
@@ -91,7 +107,7 @@ class VideoWindow
         }
         targetBox.TextChanged += (s, e) => Validate();
         Chips("VideoSizeChips", "vs", Job.ShortSide, value => Job.ShortSide = value,
-            Choice("Aynı", 0), Choice("1080p", 1080), Choice("720p", 720), Choice("480p", 480));
+            Choice(Lang.T("Aynı"), 0), Choice("1080p", 1080), Choice("720p", 720), Choice("480p", 480));
         var mute = Get<CheckBox>("VideoMute");
         mute.IsChecked = Job.Mute;
         mute.Click += (s, e) => Job.Mute = mute.IsChecked == true;
@@ -103,7 +119,7 @@ class VideoWindow
         from.TextChanged += (s, e) => { Validate(); debounce.Stop(); debounce.Start(); }; // the preview follows the start
         length.TextChanged += (s, e) => Validate();
         Chips("GifWidthChips", "gw", Job.Width, value => Job.Width = value,
-            Choice("320", 320), Choice("480", 480), Choice("640", 640), Choice("Aynı", 0));
+            Choice("320", 320), Choice("480", 480), Choice("640", 640), Choice(Lang.T("Aynı"), 0));
         Chips("GifRateChips", "gr", Job.Rate, value => Job.Rate = value, Choice("10", 10), Choice("15", 15), Choice("24", 24));
 
         Chips("AudioChips", "au", Job.AudioExt, value =>
@@ -118,7 +134,7 @@ class VideoWindow
         var name = Get<TextBox>("NameBox");
         var use = Get<CheckBox>("UseSuffix");
         var suffix = Get<TextBox>("SuffixBox");
-        if (Many) Get<TextBlock>("NameLabel").Text = "Ortak ad (boş bırakırsan her dosya kendi adını korur)";
+        if (Many) Get<TextBlock>("NameLabel").Text = Lang.T("Ortak ad (boş bırakırsan her dosya kendi adını korur)");
         use.IsChecked = Naming.UseSuffix;
         suffix.Text = Naming.Suffix;
         suffix.IsEnabled = use.IsChecked == true;
@@ -137,7 +153,8 @@ class VideoWindow
             nameEdited = true;
             Validate();
         };
-        Get<TextBlock>("Extension").Text = Job.Extension;
+        // Joined videos keep their own kind of file when they are alike, so the ending is known only then.
+        Get<TextBlock>("Extension").Text = Joins ? "" : Job.ExtensionFor(paths[0]);
         UpdateName();
     }
 
@@ -159,16 +176,25 @@ class VideoWindow
         if (Job.Task == VideoTask.Compress && Job.TargetMb > 0)
         {
             int target;
-            if (!int.TryParse(Get<TextBox>("VideoTargetBox").Text, out target) || target < 1) return "Hedef en az 1 MB olmalı.";
+            if (!int.TryParse(Get<TextBox>("VideoTargetBox").Text, out target) || target < 1) return Lang.T("Hedef en az 1 MB olmalı.");
             Job.TargetMb = target;
         }
         if (Job.Task == VideoTask.Gif)
         {
             double? from = Video.Time(Get<TextBox>("GifStartBox").Text), length = Video.Time(Get<TextBox>("GifLengthBox").Text);
-            if (from == null || length == null) return "Süreleri saniye veya dk:sn olarak yaz.";
+            if (from == null || length == null) return Lang.T("Süreleri saniye veya dk:sn olarak yaz.");
             Job.Start = from.Value;
             Job.Length = length.Value;
         }
+        if (Job.Task == VideoTask.Trim)
+        {
+            double? from = Video.Time(Get<TextBox>("TrimStartBox").Text), to = Video.Time(Get<TextBox>("TrimEndBox").Text);
+            if (from == null || to == null) return Lang.T("Süreleri saniye veya dk:sn olarak yaz.");
+            if (to > 0 && to <= from) return Lang.T("Bitiş başlangıçtan sonra olmalı.");
+            Job.Start = from.Value;
+            Job.End = to.Value;
+        }
+        if (Joins && paths.Length < 2) return Lang.T("Birleştirmek için en az iki video seç.");
         string name = Get<TextBox>("NameBox").Text;
         return Many && name == "" ? null : Naming.Problem(name);
     }
@@ -195,7 +221,7 @@ class VideoWindow
         int mine = ++loading;
         string path = paths[at];
         if (Many) Get<TextBlock>("Current").Text = (at + 1) + " / " + paths.Length + "  ·  " + Path.GetFileName(path);
-        double from = Job.Task == VideoTask.Gif ? Job.Start : -1;
+        double from = Job.Task == VideoTask.Gif || Job.Task == VideoTask.Trim ? Job.Start : -1;
         Images.Background(() =>
         {
             System.Windows.Media.Imaging.BitmapSource frame = null;
@@ -211,9 +237,9 @@ class VideoWindow
             Window.Dispatcher.BeginInvoke((Action)(() =>
             {
                 if (mine != loading) return;
-                Get<TextBlock>("Details").Text = (Many ? paths.Length + " video · gösterilen:\n" : Path.GetFileName(path) + "\n") + facts;
+                Get<TextBlock>("Details").Text = (Many ? paths.Length + Lang.T(" video · gösterilen:\n") : Path.GetFileName(path) + "\n") + facts;
                 var wait = Get<TextBlock>("Loading");
-                wait.Text = "Önizleme yok";
+                wait.Text = Lang.T("Önizleme yok");
                 wait.Visibility = frame == null ? Visibility.Visible : Visibility.Collapsed;
                 if (frame == null) Get<Grid>("Frame").Visibility = Visibility.Hidden;
                 else
@@ -232,23 +258,24 @@ class VideoWindow
         cancel = false;
         var save = Get<Button>("Save");
         save.IsEnabled = false;
-        Get<Button>("Cancel").Content = "İptal";
+        Get<Button>("Cancel").Content = Lang.T("İptal");
         Get<ScrollViewer>("Settings").IsEnabled = false;
         Error(null);
         var bar = Get<ProgressBar>("Progress");
         var status = Get<TextBlock>("Status");
         bar.Value = 0;
         bar.Visibility = status.Visibility = Visibility.Visible;
-        status.Text = "Hazırlanıyor…";
+        status.Text = Lang.T("Hazırlanıyor…");
 
         string name = Get<TextBox>("NameBox").Text, suffix = Get<TextBox>("SuffixBox").Text;
         bool use = Get<CheckBox>("UseSuffix").IsChecked == true;
         var job = Job;
-        Func<string, int, Outcome> one = (path, i) =>
+        var order = (string[])paths.Clone();
+        int count = Many ? order.Length : 1;
+        Func<int, Action<double>> report = i =>
         {
-            string own = !Many ? name : Naming.BatchName(path, name, i, job.Suffix, use, suffix);
             int shown = -1;
-            return Video.Run(job, path, own, p =>
+            return p =>
             {
                 int percent = (int)(p * 100);
                 if (percent == shown) return;
@@ -256,18 +283,21 @@ class VideoWindow
                 Window.Dispatcher.BeginInvoke((Action)(() =>
                 {
                     if (!running) return;
-                    bar.Value = (i + p) / paths.Length;
-                    status.Text = (Many ? (i + 1) + " / " + paths.Length + " · " : "") + "%" + percent;
+                    bar.Value = (i + p) / count;
+                    status.Text = (Many ? (i + 1) + " / " + count + " · " : "") + Lang.Percent(percent);
                 }));
-            }, () => cancel);
+            };
         };
+        Func<string, int, Outcome> one = (path, i) => Video.Run(job, path,
+            !Many ? name : Naming.BatchName(path, name, i, job.Suffix, use, suffix), report(i), () => cancel);
         Images.Background(() =>
         {
             Outcome outcome = null;
             string failure = null;
             try
             {
-                outcome = !Many ? one(paths[0], 0) : Images.Batch(paths, (path, i) =>
+                outcome = job.Task == VideoTask.Merge ? Video.Merge(order, name, report(0), () => cancel)
+                    : !Many ? one(order[0], 0) : Images.Batch(order, (path, i) =>
                 {
                     // A cancelled file is neither saved nor an error; the batch stops before the next one.
                     try { return one(path, i); }
@@ -285,7 +315,7 @@ class VideoWindow
                 running = false;
                 bool stopped = cancel;
                 Get<ScrollViewer>("Settings").IsEnabled = true;
-                Get<Button>("Cancel").Content = "Kapat";
+                Get<Button>("Cancel").Content = Lang.T("Kapat");
                 bar.Visibility = Visibility.Collapsed;
                 status.Visibility = Visibility.Collapsed;
                 if (outcome != null && outcome.File != null)
@@ -296,7 +326,7 @@ class VideoWindow
                 Validate();
                 if (stopped)
                 {
-                    status.Text = "İptal edildi" + (outcome != null && outcome.Saved > 0 ? "; biten " + outcome.Saved + " dosya duruyor." : ".");
+                    status.Text = Lang.T("İptal edildi") + (outcome != null && outcome.Saved > 0 ? Lang.T("; biten ") + outcome.Saved + Lang.T(" dosya duruyor.") : ".");
                     status.Visibility = Visibility.Visible;
                 }
                 else Error(failure ?? (outcome == null ? null : outcome.Text));

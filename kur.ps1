@@ -29,7 +29,7 @@ New-Item -ItemType Directory -Force (Split-Path $built) | Out-Null
     /r:WindowsBase.dll /r:Microsoft.CSharp.dll /r:System.IO.Compression.dll `
     /r:PresentationCore.dll /r:PresentationFramework.dll /r:System.Xaml.dll /r:WindowsFormsIntegration.dll `
     "/win32icon:$PSScriptRoot\app.ico" "/resource:$PSScriptRoot\app.ico,app.ico" `
-    "/resource:$PSScriptRoot\Editor.xaml,Editor.xaml" `
+    "/resource:$PSScriptRoot\Editor.xaml,Editor.xaml" "/resource:$PSScriptRoot\Preview.xaml,Preview.xaml" /r:System.Xml.dll `
     "/r:$meta\Windows.UI.winmd" "/r:$meta\Windows.Data.winmd" "/r:$meta\Windows.Foundation.winmd" `
     "/r:$meta\Windows.Media.winmd" "/r:$meta\Windows.Graphics.winmd" "/r:$meta\Windows.Globalization.winmd" "/r:$meta\Windows.Storage.winmd" "/r:$meta\Windows.Security.winmd" `
     "/r:$fw\System.Runtime.dll" "/r:$fw\System.Runtime.WindowsRuntime.dll" "/r:$fw\System.Runtime.InteropServices.WindowsRuntime.dll" `

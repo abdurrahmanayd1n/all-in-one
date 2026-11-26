@@ -29,7 +29,7 @@ static class Pinner
         var text = new StringBuilder(200);
         GetWindowText(window, text, text.Capacity);
         string title = text.ToString().Trim();
-        return title == "" ? "(adsız pencere)" : title.Length > 60 ? title.Substring(0, 60) + "…" : title;
+        return title == "" ? Lang.T("(adsız pencere)") : title.Length > 60 ? title.Substring(0, 60) + "…" : title;
     }
 
     // Still open and still on top.
@@ -55,10 +55,10 @@ static class Pinner
         bool release = IsOnTop(window);
         bool done = Native.SetWindowPos(window, new IntPtr(release ? -2 : -1), 0, 0, 0, 0, KeepPlace)
             && IsOnTop(window) != release;
-        if (!done) return "Bu pencere değiştirilemiyor (yönetici olarak çalışıyor olabilir).";
+        if (!done) return Lang.T("Bu pencere değiştirilemiyor (yönetici olarak çalışıyor olabilir).");
         pinned.Remove(window);
         if (!release) pinned.Add(window);
-        return (release ? "Sabitleme kaldırıldı: " : "Üstte sabitlendi: ") + Title(window);
+        return (release ? Lang.T("Sabitleme kaldırıldı: ") : Lang.T("Üstte sabitlendi: ")) + Title(window);
     }
 
     // The shortcut: acts on the window in front and says so at its top edge.

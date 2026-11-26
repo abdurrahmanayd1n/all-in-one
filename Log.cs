@@ -30,7 +30,7 @@ static class Log
             if ((DateTime.Now - told).TotalSeconds < 60) return;
             told = DateTime.Now;
         }
-        try { Images.Notify(new Outcome { Text = "Beklenmeyen bir hata oldu; hata kaydına yazıldı." }); }
+        try { Images.Notify(new Outcome { Text = Lang.T("Beklenmeyen bir hata oldu; hata kaydına yazıldı.") }); }
         catch (Exception x) { Error("hata bildirilemedi", x); }
     }
 

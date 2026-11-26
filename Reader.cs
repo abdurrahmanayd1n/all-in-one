@@ -44,7 +44,7 @@ static class Ocr
     {
         var engine = language == null ? OcrEngine.TryCreateFromUserProfileLanguages() : OcrEngine.TryCreateFromLanguage(language);
         if (engine == null)
-            throw new NotSupportedException("Windows'ta metin tanıma dili kurulu değil. Ayarlar > Saat ve dil > Dil bölümünden ekle.");
+            throw new NotSupportedException(Lang.T("Windows'ta metin tanıma dili kurulu değil. Ayarlar > Saat ve dil > Dil bölümünden ekle."));
         var pixels = Prepared(picture, scale);
         int w = pixels.PixelWidth, h = pixels.PixelHeight;
         var data = new byte[w * h * 4];
@@ -55,7 +55,7 @@ static class Ocr
             // The .NET helpers for WinRT tasks do not accept the metadata files that ship with Windows, so wait by hand.
             var work = engine.RecognizeAsync(bitmap);
             while (work.Status == AsyncStatus.Started) System.Threading.Thread.Sleep(10);
-            if (work.Status != AsyncStatus.Completed) throw new IOException("Metin okunamadı.", work.ErrorCode);
+            if (work.Status != AsyncStatus.Completed) throw new IOException(Lang.T("Metin okunamadı."), work.ErrorCode);
             return work.GetResults();
         }
     }
@@ -120,10 +120,10 @@ static class Ocr
             }
         }
         string all = Combined(files, texts);
-        string errors = failed == 0 ? "" : "\n" + failed + " dosya okunamadı. " + problem;
-        if (string.IsNullOrWhiteSpace(all)) return new Outcome { Text = "Görselde metin bulunamadı." + errors };
+        string errors = failed == 0 ? "" : "\n" + failed + Lang.T(" dosya okunamadı. ") + problem;
+        if (string.IsNullOrWhiteSpace(all)) return new Outcome { Text = Lang.T("Görselde metin bulunamadı.") + errors };
         ToClipboard(all);
-        var report = Copied(files.Length > 1 ? texts.Count(t => !string.IsNullOrWhiteSpace(t)) + " görselden alındı"
+        var report = Copied(files.Length > 1 ? texts.Count(t => !string.IsNullOrWhiteSpace(t)) + Lang.T(" görselden alındı")
             : all.Split('\n')[0]);
         report.Text += errors;
         return report;
@@ -133,7 +133,7 @@ static class Ocr
     public static Outcome Copied(string first)
     {
         first = first.Trim();
-        return new Outcome { Text = "Metin panoya kopyalandı\n" + (first.Length > 80 ? first.Substring(0, 80) + "…" : first) };
+        return new Outcome { Text = Lang.T("Metin panoya kopyalandı\n") + (first.Length > 80 ? first.Substring(0, 80) + "…" : first) };
     }
 }
 
@@ -158,15 +158,15 @@ class Reader
         texts = new string[files.Length];
         problems = new string[files.Length];
         Assets.Dress(Window);
-        Window.Title = "Metni Al - " + (Many ? paths.Length + " görsel" : Path.GetFileName(paths[0]));
-        Get<TextBlock>("Heading").Text = "Metni Al";
+        Window.Title = Lang.T("Metni Al - ") + (Many ? paths.Length + Lang.T(" görsel") : Path.GetFileName(paths[0]));
+        Get<TextBlock>("Heading").Text = Lang.T("Metni Al");
         Get<ScrollViewer>("Settings").Visibility = Visibility.Collapsed;
         Get<DockPanel>("ReaderPanel").Visibility = Visibility.Visible;
 
         var copy = Get<Button>("Save");
-        copy.Content = "Kopyala";
+        copy.Content = Lang.T("Kopyala");
         copy.Click += (s, e) => Copy(Get<TextBox>("Recognized").Text);
-        Get<Button>("Cancel").Content = "Kapat";
+        Get<Button>("Cancel").Content = Lang.T("Kapat");
         Get<Button>("Cancel").Click += (s, e) => Window.Close();
         Get<TextBox>("Recognized").TextChanged += (s, e) =>
         {
@@ -178,7 +178,7 @@ class Reader
         {
             Assets.Strip(Window, paths, Pick);
             var all = Get<Button>("Extra");
-            all.Content = "Tümünü kopyala";
+            all.Content = Lang.T("Tümünü kopyala");
             all.Visibility = Visibility.Visible;
             all.Click += (s, e) => Copy(Ocr.Combined(paths, texts));
         }
@@ -232,7 +232,7 @@ class Reader
             {
                 if (mine != loading) return;
                 var wait = Get<TextBlock>("Loading");
-                wait.Text = "Görsel açılamadı";
+                wait.Text = Lang.T("Görsel açılamadı");
                 wait.Visibility = picture == null ? Visibility.Visible : Visibility.Collapsed;
                 if (picture == null) Get<Grid>("Frame").Visibility = Visibility.Hidden;
                 else Assets.Fit(Window, picture.Pixels);
@@ -287,16 +287,16 @@ class Reader
     {
         string text = texts[index];
         int done = texts.Count(t => t != null);
-        Get<TextBlock>("Details").Text = text == null ? "Metin okunuyor…"
-            : problems[index] != null ? "Okunamadı"
-            : string.IsNullOrWhiteSpace(text) ? "Bu görselde metin bulunamadı"
-            : text.Split('\n').Length + " satır · " + text.Length + " karakter";
+        Get<TextBlock>("Details").Text = text == null ? Lang.T("Metin okunuyor…")
+            : problems[index] != null ? Lang.T("Okunamadı")
+            : string.IsNullOrWhiteSpace(text) ? Lang.T("Bu görselde metin bulunamadı")
+            : text.Split('\n').Length + Lang.T(" satır · ") + text.Length + " karakter";
         if (Many && done < paths.Length) Get<TextBlock>("Details").Text += " · " + done + " / " + paths.Length + " okundu";
         Get<Button>("Save").IsEnabled = !string.IsNullOrWhiteSpace(text);
-        Get<Button>("Save").Content = "Kopyala";
+        Get<Button>("Save").Content = Lang.T("Kopyala");
         var all = Get<Button>("Extra");
         all.IsEnabled = done == paths.Length && texts.Any(t => !string.IsNullOrWhiteSpace(t));
-        all.Content = "Tümünü kopyala";
+        all.Content = Lang.T("Tümünü kopyala");
     }
 
     // The button that was used says so until something changes.
@@ -308,12 +308,12 @@ class Reader
         {
             Ocr.ToClipboard(text);
             Buttons();
-            (pressed ?? Get<Button>("Save")).Content = "Kopyalandı ✓";
+            (pressed ?? Get<Button>("Save")).Content = Lang.T("Kopyalandı ✓");
         }
         catch (Exception e)
         {
             var error = Get<TextBlock>("Error");
-            error.Text = "Panoya kopyalanamadı: " + e.Message;
+            error.Text = Lang.T("Panoya kopyalanamadı: ") + e.Message;
             error.Visibility = Visibility.Visible;
         }
     }

@@ -28,16 +28,16 @@ class Preset
     // Why the numbers cannot be used, or null.
     public string Problem()
     {
-        if (MaxSide != 0 && (MaxSide < 16 || MaxSide > 20000)) return "En uzun kenar 16 ile 20000 arasında olmalı (0: değiştirme).";
-        if (LimitKb != 0 && LimitKb < 5) return "Boyut sınırı en az 5 KB olmalı (0: sınırsız).";
-        if (Quality < 10 || Quality > 100) return "Kalite 10 ile 100 arasında olmalı.";
-        return Format == "" || Format == ".jpg" || Format == ".png" || Format == ".webp" ? null : "Bilinmeyen biçim.";
+        if (MaxSide != 0 && (MaxSide < 16 || MaxSide > 20000)) return Lang.T("En uzun kenar 16 ile 20000 arasında olmalı (0: değiştirme).");
+        if (LimitKb != 0 && LimitKb < 5) return Lang.T("Boyut sınırı en az 5 KB olmalı (0: sınırsız).");
+        if (Quality < 10 || Quality > 100) return Lang.T("Kalite 10 ile 100 arasında olmalı.");
+        return Format == "" || Format == ".jpg" || Format == ".png" || Format == ".webp" ? null : Lang.T("Bilinmeyen biçim.");
     }
 
     public string NameProblem()
     {
-        if (string.IsNullOrWhiteSpace(Name)) return "Ayara bir ad ver.";
-        return Name.Contains("|") || Name.Length > 20 ? "Ayar adı en fazla 20 karakter olabilir, | içeremez." : null;
+        if (string.IsNullOrWhiteSpace(Name)) return Lang.T("Ayara bir ad ver.");
+        return Name.Contains("|") || Name.Length > 20 ? Lang.T("Ayar adı en fazla 20 karakter olabilir, | içeremez.") : null;
     }
 
     // The part of the file name that tells which recipe made it.
@@ -65,8 +65,8 @@ static class Presets
         return new List<Preset>
         {
             new Preset { Name = "Web", MaxSide = 1920, Format = ".webp", LimitKb = 500 },
-            new Preset { Name = "E-posta", MaxSide = 1600, Format = ".jpg", LimitKb = 300 },
-            new Preset { Name = "Küçük", MaxSide = 640, Format = ".jpg" }
+            new Preset { Name = Lang.T("E-posta"), MaxSide = 1600, Format = ".jpg", LimitKb = 300 },
+            new Preset { Name = Lang.T("Küçük"), MaxSide = 640, Format = ".jpg" }
         };
     }
 
@@ -83,7 +83,7 @@ static class Presets
         var all = All();
         int at = all.FindIndex(p => string.Equals(p.Name, preset.Name, StringComparison.CurrentCultureIgnoreCase));
         if (at >= 0) all[at] = preset;
-        else if (all.Count >= Most) throw new ArgumentException("En fazla " + Most + " hazır ayar olabilir; önce birini sil.");
+        else if (all.Count >= Most) throw new ArgumentException("En fazla " + Most + Lang.T(" hazır ayar olabilir; önce birini sil."));
         else all.Add(preset);
         Store(all);
     }
@@ -126,7 +126,7 @@ static class Presets
         if (!same) return null;
         long size = new FileInfo(path).Length;
         return found.Data.Length >= size || (preset.LimitKb > 0 && size <= preset.LimitKb * 1024L)
-            ? "Dosya zaten bu ayara uygun." : null;
+            ? Lang.T("Dosya zaten bu ayara uygun.") : null;
     }
 
     // The one-click option of the menu.

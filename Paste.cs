@@ -58,13 +58,13 @@ static class Paster
         try
         {
             string text = Read();
-            if (string.IsNullOrEmpty(text)) problem = "Panoda yazı yok.";
+            if (string.IsNullOrEmpty(text)) problem = Lang.T("Panoda yazı yok.");
             else Write(Convert(text, form));
         }
         catch (Exception e)
         {
             Log.Error("panodaki yazı alınamadı", e);
-            problem = "Pano kullanılamadı: " + e.Message;
+            problem = Lang.T("Pano kullanılamadı: ") + e.Message;
         }
         return problem == null;
     }
@@ -150,9 +150,9 @@ class CaseList
     public CaseList(Action<TextForm> chosen)
     {
         var rows = (Controls.StackPanel)Window.FindName("Rows");
-        var forms = new[] { Tuple.Create(TextForm.Upper, "BÜYÜK HARF"), Tuple.Create(TextForm.Lower, "küçük harf"),
-            Tuple.Create(TextForm.Title, "Her Kelime Büyük"), Tuple.Create(TextForm.Sentence, "Cümle düzeni"),
-            Tuple.Create(TextForm.Plain, "Olduğu gibi (düz yazı)") };
+        var forms = new[] { Tuple.Create(TextForm.Upper, Lang.T("BÜYÜK HARF")), Tuple.Create(TextForm.Lower, Lang.T("küçük harf")),
+            Tuple.Create(TextForm.Title, Lang.T("Her Kelime Büyük")), Tuple.Create(TextForm.Sentence, Lang.T("Cümle düzeni")),
+            Tuple.Create(TextForm.Plain, Lang.T("Olduğu gibi (düz yazı)")) };
         Action<TextForm> pick = form =>
         {
             Dismiss();

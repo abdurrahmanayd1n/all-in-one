@@ -62,14 +62,26 @@ interface IShellBrowser
 // The files and folders selected in an Explorer window or on the desktop.
 static class Target
 {
+    static string ClassOf(IntPtr window)
+    {
+        var cls = new System.Text.StringBuilder(64);
+        Native.GetClassName(window, cls, cls.Capacity);
+        return cls.ToString();
+    }
+
+    // Whether files can be selected in this window: an Explorer window or the desktop.
+    public static bool HoldsFiles(IntPtr window)
+    {
+        string c = ClassOf(window);
+        return c == "CabinetWClass" || c == "Progman" || c == "WorkerW";
+    }
+
     // Virtual items are left out; empty means the menu stays closed.
     public static string[] Selected(IntPtr window)
     {
         try
         {
-            var cls = new System.Text.StringBuilder(64);
-            Native.GetClassName(window, cls, cls.Capacity);
-            string c = cls.ToString();
+            string c = ClassOf(window);
             if (c == "Progman" || c == "WorkerW") return Files(Desktop().Document);
             if (c != "CabinetWClass") return new string[0];
 
@@ -138,45 +150,56 @@ static class Tools
     public static Item[] For(string[] files)
     {
         string single = files.Length == 1 ? files[0] : null;
-        var copy = new Item { Label = "Yolu\nKopyala", Hint = "Panoya", Icon = "",
+        var copy = new Item { Label = Lang.T("Yolu\nKopyala"), Hint = Lang.T("Panoya"), Icon = "\uE8C8",
             Run = () => Clipboard.SetText(string.Join(Environment.NewLine, files)) };
-        var terminal = new Item { Label = "Terminal\nAç", Icon = "", Run = () => OpenTerminal(files[0]) };
-        var properties = new Item { Label = "Özellikler", Icon = "",
+        var terminal = new Item { Label = Lang.T("Terminal\nAç"), Icon = "\uE756", Run = () => OpenTerminal(files[0]) };
+        var properties = new Item { Label = Lang.T("Özellikler"), Icon = "\uE946",
             Run = () => Native.SHObjectProperties(IntPtr.Zero, 2 /* SHOP_FILEPATH */, single, null) };
 
-        var rename = new Item { Label = "Yeniden\nAdlandır", Icon = "\uE8AC", Run = () => RenameWindow.Open(files) };
-        var settings = new Item { Label = "Ayarlar", Run = Preferences.Open };
-        var users = new Item { Label = "Kim\nKullanıyor?", Icon = "", Run = () => UsersWindow.Open(files) };
-        var screen = new Item { Label = "Ekrandan\nMetin", Hint = Hotkey.QuickKeys, Run = ScreenText.Start };
+        var rename = new Item { Label = Lang.T("Yeniden\nAdlandır"), Icon = "\uE8AC", Run = () => RenameWindow.Open(files) };
+        var settings = new Item { Label = Lang.T("Ayarlar"), Run = Preferences.Open };
+        var users = new Item { Label = Lang.T("Kim\nKullanıyor?"), Icon = "\uE72E", Run = () => UsersWindow.Open(files) };
+        var sum = new Item { Label = Lang.T("Doğrulama\nKodu"), Hint = "SHA-256", Icon = "\uE9D5",
+            Run = () => ChecksumWindow.Open(files) };
+        var screen = new Item { Label = Lang.T("Ekrandan\nMetin"), Hint = Shortcuts.ScreenWords.Keys, Run = ScreenText.Start };
         // The outer ring of "Diğer": the rarer tools for pictures and videos. Its options are text only.
-        Func<Item> more = () => new Item { Label = "Diğer", Hint = "Dışa kaydır", Icon = "\uE712",
-            Children = (single == null ? new[] { copy, terminal, rename, users, screen, settings }
-                : new[] { copy, terminal, rename, users, properties, screen, settings }).Select(TextOnly).ToArray() };
+        Func<Item> more = () => new Item { Label = Lang.T("Diğer"), Hint = Lang.T("Dışa kaydır"), Icon = "\uE712",
+            Children = (single == null ? new[] { copy, terminal, rename, users, sum, screen, settings }
+                : new[] { copy, terminal, rename, users, sum, properties, screen, settings }).Select(TextOnly).ToArray() };
 
         if (files.Any(Directory.Exists))
         {
-            var zip = new Item { Label = "ZIP\nYap", Hint = "Ayarları aç", Icon = "",
-                Children = new[] { new Item { Label = "Hemen", Hint = "ZIP yap", Run = () => ZipWindow.Open(files, true) } },
+            var zip = new Item { Label = Lang.T("ZIP\nYap"), Hint = Lang.T("Ayarları aç"), Icon = "\uE7B8",
+                Children = new[] { new Item { Label = Lang.T("Hemen"), Hint = Lang.T("ZIP yap"), Run = () => ZipWindow.Open(files, true) } },
                 Run = () => ZipWindow.Open(files, false) };
             if (!files.All(Directory.Exists)) return new[] { copy, terminal, zip }; // files and folders together
-            return new[]
+            var twins = new Item { Label = Lang.T("Kopya\nBul"), Hint = Lang.T("Aynı içerikli dosyalar"), Icon = "\uE721",
+                Run = () => DuplicatesWindow.Open(files) };
+            var sort = new Item { Label = Lang.T("Klasörü\nDüzenle"), Hint = Lang.T("Alt klasörlere ayır"), Icon = "\uE8CB",
+                Run = () => OrganizeWindow.Open(single) };
+            var folderTools = new[]
             {
-                new Item { Label = "Klasör\nBoyutu", Hint = "Neler yer kaplıyor", Icon = "", Run = () => SizeWindow.Open(files) },
+                new Item { Label = Lang.T("Klasör\nBoyutu"), Hint = Lang.T("Neler yer kaplıyor"), Icon = "\uE9D9", Run = () => SizeWindow.Open(files) },
                 zip,
-                new Item { Label = "İçini\nAdlandır", Hint = "Dosyaları topluca", Icon = "",
+                new Item { Label = Lang.T("İçini\nAdlandır"), Hint = Lang.T("Dosyaları topluca"), Icon = "\uE8AC",
                     Run = () => Folders.RenameContents(files) },
-                new Item { Label = "Diğer", Hint = "Dışa kaydır", Icon = "",
+                sort,
+                twins,
+                new Item { Label = Lang.T("Diğer"), Hint = Lang.T("Dışa kaydır"), Icon = "\uE712",
                     Children = (single == null ? new[] { copy, terminal, screen, settings }
                         : new[] { copy, terminal, properties, screen, settings }).Select(TextOnly).ToArray() }
             };
+            // Sorting works on one folder at a time.
+            return single != null ? folderTools : folderTools.Where(item => item != sort).ToArray();
         }
         if (Video.Available && files.All(Video.IsVideo)) return ForVideos(files, more());
+        if (Pdf.Available && files.All(Pdf.IsPdf)) return ForPdfs(files, new[] { copy, terminal, rename, users, sum, properties });
         if (!files.All(Images.IsImage))
         {
-            if (single == null) return new[] { copy, terminal, rename, users };
-            var notepad = new Item { Label = "Not\nDefteri", Icon = "",
+            if (single == null) return new[] { copy, terminal, rename, users, sum };
+            var notepad = new Item { Label = Lang.T("Not\nDefteri"), Icon = "\uE70F",
                 Run = () => Process.Start(Path.Combine(Environment.SystemDirectory, "notepad.exe"), "\"" + single + "\"") };
-            return new[] { copy, terminal, notepad, rename, users, properties };
+            return new[] { copy, terminal, notepad, rename, users, sum, properties };
         }
 
         var own = files.Select(Family).Distinct().ToArray();
@@ -184,47 +207,47 @@ static class Tools
             .Where(e => !(own.Length == 1 && own[0] == e) && (e != ".webp" || Images.Ffmpeg != null)).Select(e => new Item
         {
             Label = e == ".tif" ? "TIFF" : e.Substring(1).ToUpperInvariant(),
-            Hint = "Yeni dosya olarak",
+            Hint = Lang.T("Yeni dosya olarak"),
             Run = () =>
             {
                 var confirm = Images.Once(Images.AskWhiteBackground);
                 // In a mixed selection, files that already have the format are left alone.
-                Images.Start(files, f => Family(f) == e ? new Outcome { Text = "Zaten bu biçimde." } : Images.ConvertTo(f, e, confirm));
+                Images.Start(files, f => Family(f) == e ? new Outcome { Text = Lang.T("Zaten bu biçimde.") } : Images.ConvertTo(f, e, confirm));
             }
         }).ToArray();
         var sizes = new[] { 25, 50, 75, 200 }.Select(n => new Item
         {
-            Label = "%" + n,
-            Hint = "Yeni boyut",
+            Label = Lang.Percent(n),
+            Hint = Lang.T("Yeni boyut"),
             Run = () => Images.Start(files, f => Images.Scale(f, n))
         }).ToArray();
         Func<string, int, Item> level = (label, quality) => new Item
         {
             Label = label,
-            Hint = "Kalite " + quality,
+            Hint = Lang.T("Kalite ") + quality,
             Run = () => Images.Start(files, f => Images.Compress(f, quality))
         };
 
         return new[]
         {
-            new Item { Label = "Format\nDeğiştir", Hint = "Ayarları aç", Icon = "", Children = formats,
+            new Item { Label = Lang.T("Format\nDeğiştir"), Hint = Lang.T("Ayarları aç"), Icon = "\uE8AB", Children = formats,
                 Run = () => Editor.Open(files, Mode.Format) },
-            new Item { Label = "Ölçeklendir", Hint = "Ayarları aç", Icon = "", Children = sizes,
+            new Item { Label = Lang.T("Ölçeklendir"), Hint = Lang.T("Ayarları aç"), Icon = "\uE740", Children = sizes,
                 Run = () => Editor.Open(files, Mode.Scale) },
-            new Item { Label = "Kırp", Hint = "Ayarları aç", Icon = "", Run = () => Editor.Open(files, Mode.Crop) },
-            new Item { Label = "Sıkıştır", Hint = "Ayarları aç", Icon = "",
+            new Item { Label = Lang.T("Kırp"), Hint = Lang.T("Ayarları aç"), Icon = "\uE7A8", Run = () => Editor.Open(files, Mode.Crop) },
+            new Item { Label = Lang.T("Sıkıştır"), Hint = Lang.T("Ayarları aç"), Icon = "\uE73F",
                 Children = new[]
                 {
-                    level("Hafif", 85), level("Orta", 70), level("Güçlü", 50),
-                    new Item { Label = "Akıllı", Hint = "Gözle aynı", Run = () => Images.Start(files, Images.CompressSmart) },
-                    new Item { Label = "500 KB", Hint = "Altına indir", Run = () => Images.Start(files, f => Images.CompressUnder(f, 500)) }
+                    level(Lang.T("Hafif"), 85), level(Lang.T("Orta"), 70), level(Lang.T("Güçlü"), 50),
+                    new Item { Label = Lang.T("Akıllı"), Hint = Lang.T("Gözle aynı"), Run = () => Images.Start(files, Images.CompressSmart) },
+                    new Item { Label = Lang.T("500 KB"), Hint = Lang.T("Altına indir"), Run = () => Images.Start(files, f => Images.CompressUnder(f, 500)) }
                 },
                 Run = () => Editor.Open(files, Mode.Compress) },
-            new Item { Label = "Metni\nAl", Hint = "Pencereyi aç", Icon = "",
-                Children = new[] { new Item { Label = "Kopyala", Hint = "Metni panoya", Run = () => Images.Start(() => Ocr.Copy(files)) } },
+            new Item { Label = Lang.T("Metni\nAl"), Hint = Lang.T("Pencereyi aç"), Icon = "\uE8D2",
+                Children = new[] { new Item { Label = Lang.T("Kopyala"), Hint = Lang.T("Metni panoya"), Run = () => Images.Start(() => Ocr.Copy(files)) } },
                 Run = () => Reader.Open(files) },
-            new Item { Label = "Hazır\nAyar", Hint = "Ayarları aç", Icon = "\uE945",
-                Children = Presets.All().Select(preset => new Item { Label = preset.Name, Hint = "Tek tıkla",
+            new Item { Label = Lang.T("Hazır\nAyar"), Hint = Lang.T("Ayarları aç"), Icon = "\uE945",
+                Children = Presets.All().Select(preset => new Item { Label = preset.Name, Hint = Lang.T("Tek tıkla"),
                     Run = () => Images.Start(files, f => Presets.Apply(preset, f)) }).ToArray(),
                 Run = () => Editor.Open(files, Mode.Preset) },
             more()
@@ -238,22 +261,42 @@ static class Tools
         Func<int, int, VideoJob> shrink = (crf, side) => new VideoJob { Task = VideoTask.Compress, Crf = crf, ShortSide = side };
         Func<int, VideoJob> gif = seconds => new VideoJob { Task = VideoTask.Gif, Length = seconds };
         Func<string, VideoJob> sound = ext => new VideoJob { Task = VideoTask.Audio, AudioExt = ext };
+        // One video is cut; several are joined.
+        var edit = files.Length == 1
+            ? new Item { Label = Lang.T("Kes"), Hint = Lang.T("Bir bölümünü al"), Icon = "\uE8C6",
+                Run = () => VideoWindow.Open(files, new VideoJob { Task = VideoTask.Trim, Length = 0 }, false) }
+            : new Item { Label = Lang.T("Birleştir"), Hint = Lang.T("Tek video yap"), Icon = "\uE71B",
+                Run = () => VideoWindow.Open(files, new VideoJob { Task = VideoTask.Merge }, false) };
 
         return new[]
         {
-            new Item { Label = "Sıkıştır", Hint = "Ayarları aç", Icon = "\uE73F",
-                Children = new[] { quick("Yüksek", "Kalite öncelikli", shrink(23, 0)), quick("Orta", "Dengeli", shrink(28, 0)),
-                    quick("Küçük", "Boyut öncelikli", shrink(33, 0)), quick("720p", "Küçült", shrink(28, 720)) },
+            new Item { Label = Lang.T("Sıkıştır"), Hint = Lang.T("Ayarları aç"), Icon = "\uE73F",
+                Children = new[] { quick(Lang.T("Yüksek"), Lang.T("Kalite öncelikli"), shrink(23, 0)), quick(Lang.T("Orta"), Lang.T("Dengeli"), shrink(28, 0)),
+                    quick(Lang.T("Küçük"), Lang.T("Boyut öncelikli"), shrink(33, 0)), quick("720p", Lang.T("Küçült"), shrink(28, 720)) },
                 Run = () => VideoWindow.Open(files, shrink(28, 0), false) },
-            new Item { Label = "GIF\nYap", Hint = "Ayarları aç", Icon = "\uE8B9",
-                Children = new[] { quick("İlk 5 sn", "GIF", gif(5)), quick("İlk 10 sn", "GIF", gif(10)) },
+            edit,
+            new Item { Label = Lang.T("GIF\nYap"), Hint = Lang.T("Ayarları aç"), Icon = "\uE8B9",
+                Children = new[] { quick(Lang.T("İlk 5 sn"), "GIF", gif(5)), quick(Lang.T("İlk 10 sn"), "GIF", gif(10)) },
                 Run = () => VideoWindow.Open(files, gif(5), false) },
-            new Item { Label = "Sesi\nAyır", Hint = "Ayarları aç", Icon = "\uE8D6",
-                Children = new[] { quick("MP3", "Sesi kaydet", sound(".mp3")), quick("M4A", "Sesi kaydet", sound(".m4a")),
-                    quick("WAV", "Sesi kaydet", sound(".wav")) },
+            new Item { Label = Lang.T("Sesi\nAyır"), Hint = Lang.T("Ayarları aç"), Icon = "\uE8D6",
+                Children = new[] { quick("MP3", Lang.T("Sesi kaydet"), sound(".mp3")), quick("M4A", Lang.T("Sesi kaydet"), sound(".m4a")),
+                    quick("WAV", Lang.T("Sesi kaydet"), sound(".wav")) },
                 Run = () => VideoWindow.Open(files, sound(".mp3"), false) },
             more
         };
+    }
+
+    static Item[] ForPdfs(string[] files, Item[] rest)
+    {
+        var own = files.Length == 1
+            ? new Item { Label = Lang.T("Sayfaları\nAyır"), Hint = Lang.T("Ayarları aç"), Icon = "\uE8C6",
+                Children = new[] { new Item { Label = Lang.T("Tek tek"), Hint = Lang.T("Her sayfa ayrı"),
+                    Run = () => Images.Start(() => Pdf.SplitEach(files[0])) } },
+                Run = () => PdfWindow.Open(files) }
+            : new Item { Label = Lang.T("PDF\nBirleştir"), Hint = Lang.T("Sırayı seç"), Icon = "\uE71B",
+                Run = () => PdfWindow.Open(files) };
+        // The last of the rest, the properties, is for a single file.
+        return new[] { own }.Concat(files.Length == 1 ? rest : rest.Take(rest.Length - 1)).ToArray();
     }
 
     // The extension with its aliases folded together.
@@ -268,16 +311,16 @@ static class Tools
     {
         // A drive such as C:\ has no name of its own.
         if (files.Length == 1) return Path.GetFileName(files[0]) == "" ? files[0] : Path.GetFileName(files[0]);
-        return files.Length + (files.All(Images.IsImage) ? " görsel" : files.All(Video.IsVideo) ? " video"
-            : files.All(Directory.Exists) ? " klasör" : files.Any(Directory.Exists) ? " öğe" : " dosya");
+        return files.Length + (files.All(Images.IsImage) ? Lang.T(" görsel") : files.All(Video.IsVideo) ? Lang.T(" video")
+            : files.All(Directory.Exists) ? Lang.T(" klasör") : files.Any(Directory.Exists) ? Lang.T(" öğe") : Lang.T(" dosya"));
     }
 
     public static string Describe(string[] files)
     {
         // The size of a folder takes a scan, which the menu must not wait for.
-        if (files.Any(Directory.Exists)) return files.All(Directory.Exists) ? "Klasör" : "Dosya ve klasör";
+        if (files.Any(Directory.Exists)) return files.All(Directory.Exists) ? Lang.T("Klasör") : Lang.T("Dosya ve klasör");
         long total = files.Select(f => new FileInfo(f)).Where(f => f.Exists).Sum(f => f.Length);
-        if (files.Length > 1) return "Toplam " + Images.Size(total);
+        if (files.Length > 1) return Lang.T("Toplam ") + Images.Size(total);
         string type = Path.GetExtension(files[0]).TrimStart('.').ToUpperInvariant();
         return (type == "" ? "" : type + " · ") + Images.Size(total);
     }
@@ -301,10 +344,15 @@ class App : ApplicationContext
 {
     enum State { Idle, Pending, Opening, Open, Cancelled }
 
-    const int LeftAlt = 0xA4, Escape = 0x1B;
+    const int LeftAlt = 0xA4, Escape = 0x1B, Space = 0x20;
     const byte MaskKey = 0xE8;
+    static readonly IntPtr Replayed = (IntPtr)0xA110; // marks keys this app sends again itself
+
+    // The thread that owns the windows; set while the app runs.
+    public static System.Windows.Threading.Dispatcher Ui;
 
     State state = State.Idle;
+    bool spaceTaken; // its key-up belongs to us as well
     int generation;
     readonly Stopwatch held = new Stopwatch();
     readonly Timer timer = new Timer { Interval = 15 };
@@ -312,7 +360,6 @@ class App : ApplicationContext
     readonly NotifyIcon tray = new NotifyIcon();
     readonly Native.HookProc proc; // field keeps the delegate alive while the hook is installed
     readonly IntPtr hook;
-    readonly Hotkey quickKey, tableKey, hotkey, pinKey, pasteKey, caseKey;
 
     public App()
     {
@@ -322,41 +369,51 @@ class App : ApplicationContext
         if (hook == IntPtr.Zero) throw new System.ComponentModel.Win32Exception();
 
         using (var icon = Assets.Open("app.ico")) tray.Icon = new Icon(icon, SystemInformation.SmallIconSize);
-        tray.Text = "All In One (dosya seç, Sol Alt basılı tut)";
-        quickKey = new Hotkey('Q', ScreenText.Start, true);
-        tableKey = new Hotkey('T', ScreenText.StartTable, true);
-        hotkey = new Hotkey('O', ScreenText.Start);
-        pinKey = new Hotkey('U', Pinner.ToggleFront);
-        pasteKey = new Hotkey('Y', () => Paster.Paste(TextForm.Plain));
-        caseKey = new Hotkey('B', Paster.Choose);
-        foreach (var key in new[] { quickKey, tableKey, hotkey, pinKey, pasteKey, caseKey }.Where(k => !k.Works))
-            Log.Error("Bir kısayol başka bir programda kayıtlı olduğu için alınamadı: " + key.Name);
-        var pins = new MenuItem("Sabitlenen pencereler");
-        var picker = new MenuItem("Renk seçici simgesi", (s, e) =>
+        tray.Text = Lang.T("All In One (dosya seç, Sol Alt basılı tut)");
+        Ui = menu.Dispatcher;
+        foreach (var key in Shortcuts.Apply())
+            Log.Error("Bir kısayol başka bir programda kayıtlı olduğu için alınamadı: " + key.Keys);
+        var pins = new MenuItem(Lang.T("Sabitlenen pencereler"));
+        var snap = new MenuItem("", (s, e) => Snip.Toggle());
+        var words = new MenuItem("", (s, e) => ScreenText.Start());
+        var cells = new MenuItem("", (s, e) => ScreenText.StartTable());
+        var paste = new MenuItem("") { Enabled = false };
+        var picker = new MenuItem(Lang.T("Renk seçici simgesi"), (s, e) =>
         {
             if (Picker.Shown) Picker.Close();
             else Picker.Reopen();
         });
         tray.ContextMenu = new ContextMenu(new[]
         {
-            new MenuItem("Renk seç", (s, e) => Picker.Pick()),
+            new MenuItem(Lang.T("Renk seç"), (s, e) => Picker.Pick()),
             picker,
-            new MenuItem("Ekrandan metin al" + (quickKey.Works ? "\t" + quickKey.Name : hotkey.Works ? "\t" + hotkey.Name : ""),
-                (s, e) => ScreenText.Start()),
-            new MenuItem("Ekrandan tablo al" + (tableKey.Works ? "\t" + tableKey.Name : ""), (s, e) => ScreenText.StartTable()),
+            snap,
+            words,
+            cells,
             pins,
-            new MenuItem("Düz yapıştır: " + (pasteKey.Works ? Hotkey.PasteKeys : "kısayol kullanımda")
-                + "   ·   Harf çevir: " + (caseKey.Works ? Hotkey.CaseKeys : "kısayol kullanımda")) { Enabled = false },
-            new MenuItem("Hata kaydını aç", (s, e) => Log.Open()),
-            new MenuItem("Ayarlar", (s, e) => Preferences.Open()) { DefaultItem = true },
-            new MenuItem("Çıkış", (s, e) => ExitThread())
+            paste,
+            new MenuItem(Lang.T("Hata kaydını aç"), (s, e) => Log.Open()),
+            new MenuItem(Lang.T("Ayarlar"), (s, e) => Preferences.Open()) { DefaultItem = true },
+            new MenuItem(Lang.T("Çıkış"), (s, e) => ExitThread())
         });
+        // The shortcuts can be changed while the app runs.
+        Action named = () =>
+        {
+            Func<string, Shortcut, string> with = (label, key) => label + (key.Works ? "\t" + key.Keys : "");
+            snap.Text = Recorder.Running ? with(Lang.T("Kaydı durdur"), Shortcuts.Snap) : with(Lang.T("Ekran görüntüsü / kaydı"), Shortcuts.Snap);
+            words.Text = with(Lang.T("Ekrandan metin al"), Shortcuts.ScreenWords.Works ? Shortcuts.ScreenWords : Shortcuts.ScreenWordsToo);
+            cells.Text = with(Lang.T("Ekrandan tablo al"), Shortcuts.ScreenCells);
+            Func<Shortcut, string> keys = key => key.Works ? key.Keys : key.Code == 0 ? Lang.T("kapalı") : Lang.T("kısayol kullanımda");
+            paste.Text = Lang.T("Düz yapıştır: ") + keys(Shortcuts.PastePlain) + Lang.T("   ·   Harf çevir: ") + keys(Shortcuts.PasteCase);
+        };
+        named();
         tray.ContextMenu.Popup += (s, e) =>
         {
             picker.Checked = Picker.Shown;
-            ListPins(pins, pinKey.Works);
+            named();
+            ListPins(pins);
         };
-        ListPins(pins, pinKey.Works); // a submenu needs entries before it can open
+        ListPins(pins); // a submenu needs entries before it can open
         tray.DoubleClick += (s, e) => Preferences.Open();
         tray.Visible = true;
         Picker.Refresh();
@@ -375,7 +432,7 @@ class App : ApplicationContext
         Toast.Tray = outcome =>
         {
             saved = outcome.File;
-            tray.ShowBalloonTip(5000, saved != null ? "Kaydedildi" : "All In One", Toast.TrayText(outcome), ToolTipIcon.None);
+            tray.ShowBalloonTip(5000, saved != null ? Lang.T("Kaydedildi") : "All In One", Toast.TrayText(outcome), ToolTipIcon.None);
         };
         tray.BalloonTipClicked += (s, e) => { if (saved != null) Toast.Reveal(saved); };
         menu.WarmUp();
@@ -386,19 +443,15 @@ class App : ApplicationContext
     {
         Native.UnhookWindowsHookEx(hook);
         Pinner.ReleaseAll(); // nothing stays stuck on top after the app has gone
-        quickKey.Dispose();
-        tableKey.Dispose();
-        hotkey.Dispose();
-        pinKey.Dispose();
-        pasteKey.Dispose();
-        caseKey.Dispose();
+        Recorder.Stop(true); // a running recording is finished, not lost
+        Shortcuts.Stop();
         Picker.Remove();
         tray.Dispose();
         base.ExitThreadCore();
     }
 
     // The tray submenu: a click on a pinned window releases it.
-    static void ListPins(MenuItem pins, bool shortcut)
+    static void ListPins(MenuItem pins)
     {
         pins.MenuItems.Clear();
         var all = Pinner.Pinned();
@@ -408,12 +461,13 @@ class App : ApplicationContext
             pins.MenuItems.Add(new MenuItem(Pinner.Title(window).Replace("&", "&&"), (s, e) => Pinner.Toggle(window)));
         }
         if (all.Length == 0)
-            pins.MenuItems.Add(new MenuItem(shortcut ? "Pencereyi sabitlemek için " + Hotkey.PinKeys
-                : Hotkey.PinKeys + " başka bir programda kullanılıyor") { Enabled = false });
+            pins.MenuItems.Add(new MenuItem(Shortcuts.Pin.Works ? Lang.T("Pencereyi sabitlemek için ") + Shortcuts.Pin.Keys
+                : Shortcuts.Pin.Code == 0 ? Lang.T("Sabitleme kısayolu kapalı")
+                : Shortcuts.Pin.Keys + Lang.T(" başka bir programda kullanılıyor")) { Enabled = false });
         else
         {
             pins.MenuItems.Add("-");
-            pins.MenuItems.Add(new MenuItem("Tümünü bırak", (s, e) => Pinner.ReleaseAll()));
+            pins.MenuItems.Add(new MenuItem(Lang.T("Tümünü bırak"), (s, e) => Pinner.ReleaseAll()));
         }
     }
 
@@ -422,7 +476,8 @@ class App : ApplicationContext
     {
         try
         {
-            if (code >= 0 && Handle(Marshal.ReadInt32(lParam), wParam.ToInt32())) return (IntPtr)1;
+            if (code >= 0 && Marshal.ReadIntPtr(lParam, 16) != Replayed && Handle(Marshal.ReadInt32(lParam), wParam.ToInt32()))
+                return (IntPtr)1;
         }
         catch (Exception e) { Log.Unexpected("klavye", e); } // the key must still reach the other programs
         return Native.CallNextHookEx(hook, code, wParam, lParam);
@@ -441,6 +496,20 @@ class App : ApplicationContext
                 held.Restart();
                 timer.Start();
             }
+        }
+        else if (key == Space && !down && spaceTaken)
+        {
+            spaceTaken = false;
+            return true;
+        }
+        else if (key == Space && down && spaceTaken) return true; // auto-repeat
+        else if (key == Space && down && (state == State.Pending || state == State.Opening || state == State.Open)
+            && Prefs.Preview && Target.HoldsFiles(Native.GetForegroundWindow()))
+        {
+            Cancel();
+            spaceTaken = true;
+            BeginPreview(Native.GetForegroundWindow());
+            return true;
         }
         else if (key != MaskKey && down && state != State.Idle)
         {
@@ -492,6 +561,28 @@ class App : ApplicationContext
                 state = State.Open;
             }));
         });
+    }
+
+    // Alt+Space on selected files shows them; with nothing selected the keys go on to whoever else wants them.
+    void BeginPreview(IntPtr window)
+    {
+        Images.Background(() =>
+        {
+            string[] files = Target.Selected(window);
+            menu.Dispatcher.BeginInvoke((Action)(() =>
+            {
+                if (files.Length > 0)
+                {
+                    Run(() => Preview.Open(files));
+                    return;
+                }
+                if (!Native.IsDown(LeftAlt)) return;
+                Native.keybd_event(Space, 0, 0, (UIntPtr)(ulong)Replayed.ToInt64());
+                Native.keybd_event(Space, 0, 2, (UIntPtr)(ulong)Replayed.ToInt64());
+            }));
+        });
+        // Keeps the Alt that is still held from opening the window's menu bar when it is let go.
+        menu.Dispatcher.BeginInvoke((Action)(() => Tap(MaskKey)));
     }
 
     static void Tap(byte key)
@@ -576,6 +667,7 @@ static class Program
         // Nor may the user's settings steer the results: a throwaway key stands in for them.
         string realStore = Prefs.Store, testStore = @"Software\AllInOne-test-" + Guid.NewGuid().ToString("N");
         Prefs.Store = testStore;
+        Lang.English = false; // the expected texts are the Turkish ones, whatever Windows speaks
         try
         {
             string source = Path.Combine(dir, "a.png");
@@ -734,7 +826,8 @@ static class Program
             }
             catch (OperationCanceledException) { ok &= !File.Exists(Path.Combine(dir, "yarim2.zip")); }
             ok &= !Folders.Packable(new[] { @"C:\" }) && Tools.Title(new[] { @"C:\" }) == @"C:\"
-                && Tools.For(new[] { tree }).Length == 4 && Tools.For(new[] { tree, source }).Length == 3
+                && Tools.For(new[] { tree }).Length == 6 && Tools.For(new[] { tree, tree }).Length == 5
+                && Tools.For(new[] { tree, source }).Length == 3
                 && Tools.Title(new[] { tree, tree }) == "2 klasör" && Tools.Describe(new[] { tree }) == "Klasör";
             new ZipWindow(new[] { tree }, false).Window.Close();
             new SizeWindow(new[] { tree }).Window.Close();
@@ -902,8 +995,8 @@ static class Program
             // Several files: the menu, the sizes, the crop areas, the names and a batch with one bad file.
             string note = Path.Combine(dir, "n.txt");
             File.WriteAllText(note, "x");
-            ok &= Tools.For(new[] { source, source }).Length == 7 && Tools.For(new[] { source, note }).Length == 4
-                && Tools.For(new[] { note }).Length == 6 && Tools.Title(new[] { source, source }).StartsWith("2 ");
+            ok &= Tools.For(new[] { source, source }).Length == 7 && Tools.For(new[] { source, note }).Length == 5
+                && Tools.For(new[] { note }).Length == 7 && Tools.Title(new[] { source, source }).StartsWith("2 ");
             int tw, th;
             Images.TargetSize(400, 200, 50, 0, 0, 0, true, out tw, out th);
             ok &= tw == 200 && th == 100;
@@ -1098,6 +1191,7 @@ static class Program
                 var tighter = Images.Compress(webp.File, 20);
                 ok &= keeps(tighter, ".webp") && new FileInfo(tighter.File).Length < new FileInfo(webp.File).Length;
             }
+            ok &= Tests.Run(dir);
             return ok ? 0 : 2;
         }
         finally

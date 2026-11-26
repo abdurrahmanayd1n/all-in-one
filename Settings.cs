@@ -2,6 +2,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using Microsoft.Win32;
 
 static class Prefs
@@ -67,6 +68,13 @@ static class Prefs
         set { SetNumber("CopyRgb", value ? 1 : 0); }
     }
 
+    // Alt+Space on selected files opens the preview.
+    public static bool Preview
+    {
+        get { return Number("Preview", 1) != 0; }
+        set { SetNumber("Preview", value ? 1 : 0); }
+    }
+
     // Whether Windows starts the app at sign-in.
     public static bool Autostart
     {
@@ -107,9 +115,9 @@ class Preferences
     public Preferences()
     {
         Assets.Dress(Window);
-        Window.Title = "All In One - Ayarlar";
-        Get<TextBlock>("Heading").Text = "Ayarlar";
-        Get<TextBlock>("Details").Text = "Değişiklikler hemen uygulanır.";
+        Window.Title = Lang.T("All In One - Ayarlar");
+        Get<TextBlock>("Heading").Text = Lang.T("Ayarlar");
+        Get<TextBlock>("Details").Text = Lang.T("Değişiklikler hemen uygulanır.");
         Get<ScrollViewer>("Settings").Visibility = Visibility.Collapsed;
         Get<ScrollViewer>("Preferences").Visibility = Visibility.Visible;
         Get<TextBlock>("Loading").Visibility = Visibility.Collapsed;
@@ -118,7 +126,7 @@ class Preferences
         Get<Image>("AboutIcon").Source = Assets.Icon();
         Get<Button>("Save").Visibility = Visibility.Collapsed;
         var close = Get<Button>("Cancel");
-        close.Content = "Kapat";
+        close.Content = Lang.T("Kapat");
         close.Click += (s, e) => Window.Close();
 
         var slider = Get<Slider>("HoldSlider");
@@ -149,6 +157,22 @@ class Preferences
 
         Get<Button>("Uninstall").Click += (s, e) => Uninstall.Ask();
 
+        var preview = Get<CheckBox>("PreviewKey");
+        preview.IsChecked = Prefs.Preview;
+        preview.Click += (s, e) => Try(() => Prefs.Preview = preview.IsChecked == true);
+
+        foreach (var choice in new[] { Tuple.Create(Lang.T("Windows'un dili"), Tongue.System), Tuple.Create("Türkçe", Tongue.Turkish),
+            Tuple.Create("English", Tongue.English) })
+        {
+            var value = choice.Item2;
+            var chip = new RadioButton { Content = choice.Item1, GroupName = "tongue", IsChecked = Lang.Chosen == value };
+            chip.SetResourceReference(FrameworkElement.StyleProperty, "Chip");
+            chip.Checked += (s, e) => Try(() => Lang.Chosen = value);
+            Get<WrapPanel>("TongueChips").Children.Add(chip);
+        }
+
+        SetUpShortcuts();
+
         var use = Get<CheckBox>("FixedSuffix");
         var suffix = Get<TextBox>("FixedSuffixBox");
         use.IsChecked = Naming.UseSuffix;
@@ -158,17 +182,112 @@ class Preferences
             suffix.IsEnabled = use.IsChecked == true;
             string problem = Naming.Problem("x" + suffix.Text + "x");
             var hint = Get<TextBlock>("FixedSuffixHint");
-            hint.Text = problem ?? (use.IsChecked == true ? "Örnek: tatil" + suffix.Text + ".jpg"
-                : "Kapalıyken işleme göre ad önerilir.");
+            hint.Text = problem ?? (use.IsChecked == true ? Lang.T("Örnek: tatil") + suffix.Text + ".jpg"
+                : Lang.T("Kapalıyken işleme göre ad önerilir."));
             if (problem == null) Try(() => Naming.Remember(use.IsChecked == true, suffix.Text));
         };
         use.Click += (s, e) => changed();
         suffix.TextChanged += (s, e) => changed();
         suffix.IsEnabled = use.IsChecked == true;
-        Get<TextBlock>("FixedSuffixHint").Text = use.IsChecked == true ? "Örnek: tatil" + suffix.Text + ".jpg"
-            : "Kapalıyken işleme göre ad önerilir.";
+        Get<TextBlock>("FixedSuffixHint").Text = use.IsChecked == true ? Lang.T("Örnek: tatil") + suffix.Text + ".jpg"
+            : Lang.T("Kapalıyken işleme göre ad önerilir.");
         Window.Closed += (s, e) => { if (shown == this) shown = null; };
     }
+
+    Shortcut listening; // the shortcut whose new keys are awaited
+    readonly System.Collections.Generic.Dictionary<Shortcut, Button> boxes
+        = new System.Collections.Generic.Dictionary<Shortcut, Button>();
+
+    void SetUpShortcuts()
+    {
+        var rows = Get<StackPanel>("Keys");
+        foreach (var each in Shortcuts.All)
+        {
+            var shortcut = each;
+            var row = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
+            var box = new Button { MinWidth = 120, Padding = new Thickness(10, 5, 10, 5) };
+            System.Windows.Automation.AutomationProperties.SetName(box, shortcut.Label);
+            DockPanel.SetDock(box, Dock.Right);
+            box.Click += (s, e) =>
+            {
+                // While the keys are chosen none of ours may react to them.
+                Shortcuts.Release();
+                listening = shortcut;
+                ShowShortcuts();
+            };
+            box.LostKeyboardFocus += (s, e) => { if (listening == shortcut) Listened(); };
+            boxes[shortcut] = box;
+            row.Children.Add(box);
+            row.Children.Add(new TextBlock { Text = Lang.T(shortcut.Label), VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis });
+            rows.Children.Add(row);
+        }
+        Get<Button>("KeysReset").Click += (s, e) =>
+        {
+            Try(() => { foreach (var each in Shortcuts.All) each.Code = each.Usual; });
+            Listened();
+        };
+        Window.PreviewKeyDown += (s, e) => { if (listening != null) e.Handled = Hear(e); };
+        Window.Closed += (s, e) => { if (listening != null) Listened(); };
+        ShowShortcuts();
+    }
+
+    bool Hear(KeyEventArgs e)
+    {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key == Key.LeftCtrl || key == Key.RightCtrl || key == Key.LeftAlt || key == Key.RightAlt || key == Key.LeftShift
+            || key == Key.RightShift || key == Key.LWin || key == Key.RWin) return true; // the rest is still to come
+        int modifiers = (Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt) ? Shortcuts.Alt : 0)
+            | (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl) ? Shortcuts.Ctrl : 0)
+            | (Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift) ? Shortcuts.Shift : 0)
+            | (Keyboard.IsKeyDown(Key.LWin) || Keyboard.IsKeyDown(Key.RWin) ? Shortcuts.Win : 0);
+        if (modifiers == 0 && key == Key.Escape) Listened();
+        else
+        {
+            int code = modifiers == 0 && (key == Key.Delete || key == Key.Back) ? 0
+                : modifiers << 16 | KeyInterop.VirtualKeyFromKey(key);
+            var target = listening;
+            string problem = Shortcuts.Problem(target, code);
+            var hint = Get<TextBlock>("KeysHint");
+            hint.Text = problem ?? "";
+            hint.Visibility = problem == null ? Visibility.Collapsed : Visibility.Visible;
+            if (problem != null) return true; // keeps listening
+            Try(() => target.Code = code);
+            Listened();
+            if (code != 0 && target.Registered != null && !target.Works)
+            {
+                hint.Text = Lang.F("{0} başka bir programda kullanılıyor; başka tuşlar seç.", Shortcuts.Name(code));
+                hint.Visibility = Visibility.Visible;
+            }
+        }
+        return true;
+    }
+
+    // Ends the waiting and puts the shortcuts back to work.
+    void Listened()
+    {
+        listening = null;
+        Shortcuts.Resume();
+        ShowShortcuts();
+    }
+
+    void ShowShortcuts()
+    {
+        foreach (var pair in boxes)
+        {
+            pair.Value.Content = pair.Key == listening ? Lang.T("Tuşlara bas…")
+                : pair.Key.Code == 0 ? Lang.T("Kapalı") : pair.Key.Keys;
+            pair.Value.Background = pair.Key == listening ? System.Windows.Media.Brushes.SteelBlue
+                : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x33, 0x35, 0x3F));
+        }
+        Get<TextBlock>("AboutText").Text = Lang.F("Dosya gezgininde veya masaüstünde dosya seç, sonra Sol Alt tuşunu basılı tut; "
+            + "Alt+Space dosyayı önizler. Birden fazla dosya için Ctrl ile tıkla.\n\nEkran görüntüsü ve kaydı: {0}\nEkrandan metin: {1}"
+            + "\nEkrandan tablo: {2}\nPencereyi üstte tut: {3}\nBiçimsiz yapıştır: {4}\nHarf çevirip yapıştır: {5}",
+            Told(Shortcuts.Snap), Told(Shortcuts.ScreenWords), Told(Shortcuts.ScreenCells), Told(Shortcuts.Pin),
+            Told(Shortcuts.PastePlain), Told(Shortcuts.PasteCase));
+    }
+
+    static string Told(Shortcut shortcut) { return shortcut.Code == 0 ? Lang.T("kapalı") : shortcut.Keys; }
 
     // A refused registry write is told instead of ending the app.
     void Try(Action write)
@@ -181,7 +300,7 @@ class Preferences
         }
         catch (Exception e)
         {
-            error.Text = "Ayar kaydedilemedi: " + e.Message;
+            error.Text = Lang.T("Ayar kaydedilemedi: ") + e.Message;
             error.Visibility = Visibility.Visible;
         }
     }

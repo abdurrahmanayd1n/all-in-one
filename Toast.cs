@@ -34,10 +34,11 @@ static class Toast
 
     public static string Xml(Outcome outcome)
     {
-        var lines = new[] { outcome.File != null ? "Kaydedildi" : "All In One" }.Concat(outcome.Text.Split('\n'));
+        var lines = new[] { outcome.File != null ? Lang.T("Kaydedildi") : "All In One" }.Concat(outcome.Text.Split('\n'));
         string texts = string.Concat(lines.Select(line => "<text>" + SecurityElement.Escape(line) + "</text>"));
         string button = outcome.File == null ? ""
-            : "<actions><action content=\"Klasörde göster\" arguments=\"reveal\" activationType=\"foreground\"/></actions>";
+            : "<actions><action content=\"" + SecurityElement.Escape(Lang.T("Klasörde göster"))
+                + "\" arguments=\"reveal\" activationType=\"foreground\"/></actions>";
         return "<toast><visual><binding template=\"ToastGeneric\">" + texts + "</binding></visual>" + button + "</toast>";
     }
 
@@ -62,8 +63,8 @@ static class Toast
     // The icon's notification takes at most 255 characters and no empty text.
     public static string TrayText(Outcome outcome)
     {
-        string tail = outcome.File != null ? "\nKlasörde göstermek için tıkla." : "";
-        string text = string.IsNullOrWhiteSpace(outcome.Text) ? "Tamamlandı." : outcome.Text;
+        string tail = outcome.File != null ? Lang.T("\nKlasörde göstermek için tıkla.") : "";
+        string text = string.IsNullOrWhiteSpace(outcome.Text) ? Lang.T("Tamamlandı.") : outcome.Text;
         int room = 255 - tail.Length;
         return (text.Length > room ? text.Substring(0, room - 1) + "…" : text) + tail;
     }
@@ -88,7 +89,7 @@ static class Toast
         catch (Exception e) // the result must still reach the user when the notification platform fails
         {
             Log.Error("bildirim gösterilemedi", e);
-            System.Windows.Forms.MessageBox.Show(outcome.Text + "\n\n(Bildirim gösterilemedi: " + e.Message + ")", "All In One");
+            System.Windows.Forms.MessageBox.Show(outcome.Text + Lang.T("\n\n(Bildirim gösterilemedi: ") + e.Message + ")", "All In One");
         }
     }
 

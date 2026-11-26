@@ -29,7 +29,10 @@ static class Assets
 
     public static Window Window(string name)
     {
-        using (var stream = Open(name)) return (Window)XamlReader.Load(stream);
+        Window window;
+        using (var stream = Open(name)) window = (Window)XamlReader.Load(stream);
+        Lang.Translate(window); // before any code writes into it
+        return window;
     }
 
     // What every popup shares: the one window size, the icon, the dark caption and the entrance.
@@ -103,6 +106,51 @@ static class Assets
                 catch (Exception) { } // the number stays; opening the picture shows why
             }
         });
+    }
+
+    // The list of files that are joined: a click shows one, the arrows move it. The array itself is reordered.
+    public static void Order(Window window, string[] files, Action<int> picked, Action reordered)
+    {
+        ((StackPanel)window.FindName("OrderPanel")).Visibility = Visibility.Visible;
+        var rows = (StackPanel)window.FindName("OrderRows");
+        int shown = 0;
+        Action build = null;
+        build = () =>
+        {
+            rows.Children.Clear();
+            for (int i = 0; i < files.Length; i++)
+            {
+                int at = i;
+                var row = new DockPanel();
+                foreach (int step in new[] { 1, -1 })
+                {
+                    int by = step;
+                    var move = new Button { Content = by < 0 ? "▲" : "▼", Padding = new Thickness(8, 3, 8, 3), FontSize = 11,
+                        Margin = new Thickness(4, 0, 0, 8), IsEnabled = at + by >= 0 && at + by < files.Length };
+                    System.Windows.Automation.AutomationProperties.SetName(move, by < 0 ? Lang.T("Yukarı taşı") : Lang.T("Aşağı taşı"));
+                    move.Click += (s, e) =>
+                    {
+                        string moved = files[at];
+                        files[at] = files[at + by];
+                        files[at + by] = moved;
+                        shown = at + by;
+                        build();
+                        reordered();
+                        picked(shown);
+                    };
+                    DockPanel.SetDock(move, Dock.Right);
+                    row.Children.Add(move);
+                }
+                var name = new RadioButton { GroupName = "order", IsChecked = at == shown, ToolTip = files[at],
+                    Content = new TextBlock { Text = (at + 1) + ".  " + Path.GetFileName(files[at]),
+                        TextTrimming = TextTrimming.CharacterEllipsis } };
+                name.SetResourceReference(FrameworkElement.StyleProperty, "Chip");
+                name.Checked += (s, e) => { shown = at; picked(at); };
+                row.Children.Add(name);
+                rows.Children.Add(row);
+            }
+        };
+        build();
     }
 
     // Sizes the preview to a picture: as large as the stage allows, never enlarged.
@@ -186,9 +234,9 @@ class Editor
     {
         paths = files;
         this.mode = mode;
-        string title = mode == Mode.Format ? "Format Değiştir" : mode == Mode.Scale ? "Ölçeklendir"
-            : mode == Mode.Compress ? "Sıkıştır" : mode == Mode.Crop ? "Kırp" : "Hazır Ayarlar";
-        string subject = Many ? paths.Length + " görsel" : Path.GetFileName(paths[0]);
+        string title = mode == Mode.Format ? Lang.T("Format Değiştir") : mode == Mode.Scale ? Lang.T("Ölçeklendir")
+            : mode == Mode.Compress ? Lang.T("Sıkıştır") : mode == Mode.Crop ? Lang.T("Kırp") : Lang.T("Hazır Ayarlar");
+        string subject = Many ? paths.Length + Lang.T(" görsel") : Path.GetFileName(paths[0]);
         Window.Title = title + " - " + subject;
         Assets.Dress(Window);
         Get<TextBlock>("Heading").Text = title;
@@ -237,7 +285,7 @@ class Editor
         Action showQuality = () => Get<TextBlock>("QualityValue").Text = ((int)quality.Value).ToString();
         quality.ValueChanged += (s, e) => { showQuality(); Mark("QualityChips", (int)quality.Value); Changed(); };
         showQuality();
-        var levels = new Dictionary<string, int> { { "Hafif", 85 }, { "Orta", 70 }, { "Güçlü", 50 } };
+        var levels = new Dictionary<string, int> { { Lang.T("Hafif"), 85 }, { Lang.T("Orta"), 70 }, { Lang.T("Güçlü"), 50 } };
         foreach (var level in levels)
         {
             int value = level.Value;
@@ -253,7 +301,7 @@ class Editor
         {
             Get<StackPanel>("FormatPanel").Visibility = Visibility.Visible;
             // The first choice follows each picture: JPG, PNG when transparent, WebP stays WebP.
-            Chip(Get<WrapPanel>("FormatChips"), "format", Many ? "Otomatik" : "JPG", () => PickFormat(null)).IsChecked = true;
+            Chip(Get<WrapPanel>("FormatChips"), "format", Many ? Lang.T("Otomatik") : "JPG", () => PickFormat(null)).IsChecked = true;
             Chip(Get<WrapPanel>("FormatChips"), "format", "WebP", () => PickFormat(".webp"));
         }
 
@@ -278,7 +326,7 @@ class Editor
             foreach (int percent in new[] { 25, 50, 75, 100, 150, 200 })
             {
                 int value = percent;
-                var chip = Chip(Get<WrapPanel>("ScaleChips"), "scale", "%" + percent, () => { scale.Value = value; SizeFromPercent(); });
+                var chip = Chip(Get<WrapPanel>("ScaleChips"), "scale", Lang.Percent(percent), () => { scale.Value = value; SizeFromPercent(); });
                 chip.Tag = value;
                 chip.IsChecked = percent == 50;
             }
@@ -291,7 +339,7 @@ class Editor
         if (mode == Mode.Crop)
         {
             var ratios = new Dictionary<string, double> {
-                { "Serbest", 0 }, { "Özgün", -1 }, { "1:1", 1 }, { "4:3", 4.0 / 3 }, { "3:4", 3.0 / 4 }, { "3:2", 1.5 },
+                { Lang.T("Serbest"), 0 }, { Lang.T("Özgün"), -1 }, { "1:1", 1 }, { "4:3", 4.0 / 3 }, { "3:4", 3.0 / 4 }, { "3:2", 1.5 },
                 { "2:3", 2.0 / 3 }, { "4:5", 4.0 / 5 }, { "5:4", 5.0 / 4 }, { "16:9", 16.0 / 9 }, { "9:16", 9.0 / 16 },
                 { "21:9", 21.0 / 9 }, { "9:21", 9.0 / 21 } };
             foreach (var entry in ratios)
@@ -309,11 +357,11 @@ class Editor
     void SetUpShapes()
     {
         var names = new Dictionary<CropShape, string> {
-            { CropShape.Rectangle, "Dikdörtgen" }, { CropShape.Rounded, "Yuvarlak köşe" }, { CropShape.Circle, "Daire" },
-            { CropShape.Ellipse, "Elips" }, { CropShape.Triangle, "Üçgen" }, { CropShape.Diamond, "Baklava" },
-            { CropShape.Hexagon, "Altıgen" }, { CropShape.Star, "Yıldız" }, { CropShape.Heart, "Kalp" } };
+            { CropShape.Rectangle, Lang.T("Dikdörtgen") }, { CropShape.Rounded, Lang.T("Yuvarlak köşe") }, { CropShape.Circle, Lang.T("Daire") },
+            { CropShape.Ellipse, Lang.T("Elips") }, { CropShape.Triangle, Lang.T("Üçgen") }, { CropShape.Diamond, Lang.T("Baklava") },
+            { CropShape.Hexagon, Lang.T("Altıgen") }, { CropShape.Star, Lang.T("Yıldız") }, { CropShape.Heart, Lang.T("Kalp") } };
         var round = Get<Slider>("RoundSlider");
-        Action showRound = () => Get<TextBlock>("RoundValue").Text = "%" + (int)round.Value;
+        Action showRound = () => Get<TextBlock>("RoundValue").Text = Lang.Percent((int)round.Value);
         round.ValueChanged += (s, e) => { showRound(); Redraw(); };
         showRound();
         foreach (var entry in names)
@@ -338,9 +386,9 @@ class Editor
     {
         Get<StackPanel>("OutputPanel").Visibility = Visibility.Visible;
         var panel = Get<WrapPanel>("OutputChips");
-        Chip(panel, "output", "Ayrı dosyalar", () => PickOutput(false)).IsChecked = true;
+        Chip(panel, "output", Lang.T("Ayrı dosyalar"), () => PickOutput(false)).IsChecked = true;
         // The archive fields sit low in the panel: bring them into view when they appear.
-        Chip(panel, "output", "Tek ZIP", () =>
+        Chip(panel, "output", Lang.T("Tek ZIP"), () =>
         {
             PickOutput(true);
             Get<TextBox>("ZipBox").Dispatcher.BeginInvoke((Action)(() => Get<StackPanel>("ZipPanel").BringIntoView()),
@@ -365,7 +413,7 @@ class Editor
         {
             if (ext == ".webp" && Images.Ffmpeg == null) continue;
             string choice = ext;
-            Chip(formats, "format", ext == "" ? "Aynı" : Images.Kind(ext), () => PickFormat(choice == "" ? null : choice)).Tag = ext;
+            Chip(formats, "format", ext == "" ? Lang.T("Aynı") : Images.Kind(ext), () => PickFormat(choice == "" ? null : choice)).Tag = ext;
         }
         foreach (string name in new[] { "PresetSideBox", "PresetLimitBox", "PresetNameBox" })
             Get<TextBox>(name).TextChanged += (s, e) =>
@@ -441,18 +489,18 @@ class Editor
             Changed();
         };
         var panel = Get<WrapPanel>("MethodChips");
-        Chip(panel, "method", "Elle", () => PickMethod(Method.Manual)).IsChecked = true;
-        Chip(panel, "method", "Akıllı", () => PickMethod(Method.Smart));
-        Chip(panel, "method", "Hedef boyut", () => PickMethod(Method.Target));
+        Chip(panel, "method", Lang.T("Elle"), () => PickMethod(Method.Manual)).IsChecked = true;
+        Chip(panel, "method", Lang.T("Akıllı"), () => PickMethod(Method.Smart));
+        Chip(panel, "method", Lang.T("Hedef boyut"), () => PickMethod(Method.Target));
     }
 
     void PickMethod(Method value)
     {
         method = value;
         Get<TextBlock>("MethodHint").Text = value == Method.Smart
-            ? "Her görsel için gözle fark edilmeyecek en düşük kaliteyi kendisi bulur."
-            : value == Method.Target ? "Dosyayı bu boyutun altına indirir. Kalite yetmezse görseli de küçültür."
-            : "Kaliteyi sen seçersin.";
+            ? Lang.T("Her görsel için gözle fark edilmeyecek en düşük kaliteyi kendisi bulur.")
+            : value == Method.Target ? Lang.T("Dosyayı bu boyutun altına indirir. Kalite yetmezse görseli de küçültür.")
+            : Lang.T("Kaliteyi sen seçersin.");
         Get<StackPanel>("TargetPanel").Visibility = value == Method.Target ? Visibility.Visible : Visibility.Collapsed;
         ShowQuality();
         // Typing a target should not start a search for every digit.
@@ -519,7 +567,7 @@ class Editor
     void SizeFromPercent()
     {
         var scale = Get<Slider>("ScaleSlider");
-        Get<TextBlock>("ScaleValue").Text = "%" + (int)scale.Value;
+        Get<TextBlock>("ScaleValue").Text = Lang.Percent((int)scale.Value);
         typed = 0;
         if (picture == null) return;
         syncing = true;
@@ -544,7 +592,7 @@ class Editor
                 Get<TextBox>(width ? "HeightBox" : "WidthBox").Text =
                     Images.Percent(width ? picture.Pixels.PixelHeight : picture.Pixels.PixelWidth, percent).ToString();
             Get<Slider>("ScaleSlider").Value = percent;
-            Get<TextBlock>("ScaleValue").Text = "%" + (int)Math.Round(percent);
+            Get<TextBlock>("ScaleValue").Text = Lang.Percent((int)Math.Round(percent));
             foreach (RadioButton chip in Get<WrapPanel>("ScaleChips").Children) chip.IsChecked = false;
             syncing = false;
         }
@@ -769,7 +817,7 @@ class Editor
         var name = Get<TextBox>("NameBox");
         var use = Get<CheckBox>("UseSuffix");
         var suffix = Get<TextBox>("SuffixBox");
-        if (Many) Get<TextBlock>("NameLabel").Text = "Ortak ad (boş bırakırsan her dosya kendi adını korur)";
+        if (Many) Get<TextBlock>("NameLabel").Text = Lang.T("Ortak ad (boş bırakırsan her dosya kendi adını korur)");
         use.IsChecked = Naming.UseSuffix;
         suffix.Text = Naming.Suffix;
         suffix.IsEnabled = use.IsChecked == true;
@@ -839,9 +887,9 @@ class Editor
             syncing = was;
         }
         Get<TextBlock>("SuffixHint").Text = Many
-            ? "Örnek: " + Naming.BatchName(path, Get<TextBox>("NameBox").Text, index, OperationSuffix(s, w, h), s.UseSuffix, s.Suffix) + extension
-            : s.UseSuffix ? "Açıkken kaydedilen her dosya kendi adı + bu eki alır."
-            : "Kapalıyken işleme göre ad önerilir. Aynı ad varsa (2) eklenir.";
+            ? Lang.T("Örnek: ") + Naming.BatchName(path, Get<TextBox>("NameBox").Text, index, OperationSuffix(s, w, h), s.UseSuffix, s.Suffix) + extension
+            : s.UseSuffix ? Lang.T("Açıkken kaydedilen her dosya kendi adı + bu eki alır.")
+            : Lang.T("Kapalıyken işleme göre ad önerilir. Aynı ad varsa (2) eklenir.");
         Validate();
     }
 
@@ -897,14 +945,14 @@ class Editor
     string Invalid()
     {
         var s = Read();
-        string archive = s.Zip && Naming.Problem(s.ZipName) != null ? "ZIP adı: " + Naming.Problem(s.ZipName) : null;
+        string archive = s.Zip && Naming.Problem(s.ZipName) != null ? Lang.T("ZIP adı: ") + Naming.Problem(s.ZipName) : null;
         return (Many && s.Name == "" ? null : Naming.Problem(s.Name)) ?? archive ?? SettingsProblem(s);
     }
 
     // Why no result can be computed; the file name does not matter for that.
     string SettingsProblem(Settings s)
     {
-        if (s.Method == Method.Target && s.TargetKb < 5) return "Hedef en az 5 KB olmalı.";
+        if (s.Method == Method.Target && s.TargetKb < 5) return Lang.T("Hedef en az 5 KB olmalı.");
         if (mode == Mode.Preset && s.Preset.Problem() != null) return s.Preset.Problem();
         if (picture == null) return null;
         if (mode == Mode.Scale)
@@ -915,12 +963,12 @@ class Editor
             int w = 0, h = 0;
             if (!missing) Size(s, picture, out w, out h);
             if (missing || w < 1 || h < 1 || (long)w * h > Images.MaxPixels)
-                return "Geçerli bir boyut yaz (en fazla 100 megapiksel).";
+                return Lang.T("Geçerli bir boyut yaz (en fazla 100 megapiksel).");
         }
         if (mode == Mode.Crop)
         {
             var area = Area(s, picture);
-            if (area.Width < 1 || area.Height < 1) return "Kırpılacak alanı seç.";
+            if (area.Width < 1 || area.Height < 1) return Lang.T("Kırpılacak alanı seç.");
         }
         return null;
     }
@@ -958,7 +1006,7 @@ class Editor
                 {
                     if (mine != loading) return;
                     var text = Get<TextBlock>("Loading");
-                    text.Text = "Görsel açılamadı";
+                    text.Text = Lang.T("Görsel açılamadı");
                     text.Visibility = Visibility.Visible;
                     Get<Grid>("Frame").Visibility = Visibility.Hidden;
                     Show(e.Message);
@@ -980,7 +1028,7 @@ class Editor
         RadialMenu.Animate(Get<Image>("Preview"), UIElement.OpacityProperty, 0, 1, 300);
         string clear = picture.Transparent ? " · saydam" : "";
         Get<TextBlock>("Details").Text = Many
-            ? paths.Length + " görsel · toplam " + Images.Size(paths.Sum(p => new FileInfo(p).Length)) + "\nGösterilen: " + w + " × " + h + clear
+            ? paths.Length + Lang.T(" görsel · toplam ") + Images.Size(paths.Sum(p => new FileInfo(p).Length)) + Lang.T("\nGösterilen: ") + w + " × " + h + clear
             : Path.GetFileName(path) + "\n" + w + " × " + h + " · " + Images.Size(new FileInfo(path).Length) + clear;
 
         if (!shownOnce)
@@ -1031,7 +1079,7 @@ class Editor
         Get<StackPanel>("QualityInfo").Visibility = report.Quality == null ? Visibility.Hidden : Visibility.Visible;
         Get<TextBlock>("QualityAfter").Text = report.Quality;
         var summary = Get<TextBlock>("Result");
-        summary.Text = (Many && report.Summary != null ? "Bu görsel · " : "") + report.Summary;
+        summary.Text = (Many && report.Summary != null ? Lang.T("Bu görsel · ") : "") + report.Summary;
         summary.Foreground = Tint(report.Trend);
         var note = Get<TextBlock>("Note");
         note.Text = report.Note;
@@ -1088,7 +1136,7 @@ class Editor
                 {
                     if (run != totalRun) return;
                     line.Foreground = Tint(0);
-                    line.Text = "Tüm seçim hesaplanıyor… " + (at + 1) + " / " + paths.Length;
+                    line.Text = Lang.T("Tüm seçim hesaplanıyor… ") + (at + 1) + " / " + paths.Length;
                 }));
                 // The same files are left out as when saving.
                 try
@@ -1107,11 +1155,11 @@ class Editor
                 }
                 catch (Exception) { failed++; }
             }
-            string text = saved == 0 ? "Tüm seçim: hiçbir dosya kaydedilmeyecek"
-                : "Tüm seçim (" + saved + " dosya): " + Images.Size(before) + " → " + Images.Size(after)
+            string text = saved == 0 ? Lang.T("Tüm seçim: hiçbir dosya kaydedilmeyecek")
+                : Lang.T("Tüm seçim (") + saved + Lang.T(" dosya): ") + Images.Size(before) + " → " + Images.Size(after)
                     + " · " + Images.Difference(before, after);
             if (skipped > 0) text += " · " + skipped + " atlanacak";
-            if (failed > 0) text += " · " + failed + " dosya işlenemiyor";
+            if (failed > 0) text += " · " + failed + Lang.T(" dosya işlenemiyor");
             Window.Dispatcher.BeginInvoke((Action)(() =>
             {
                 totalBusy = false;
@@ -1135,7 +1183,7 @@ class Editor
     void Changed()
     {
         if (picture == null) return;
-        if (Many && TotalKey(Read()) != totalKey) DropTotal("Tüm seçim: hesaplanacak…");
+        if (Many && TotalKey(Read()) != totalKey) DropTotal(Lang.T("Tüm seçim: hesaplanacak…"));
         // The values on screen belong to the old settings until the new result is ready.
         Get<Grid>("Values").Opacity = 0.45;
         Validate();
@@ -1167,7 +1215,7 @@ class Editor
         var s = Read();
         var current = picture;
         string path = paths[index];
-        if (!saving) Get<TextBlock>("Result").Text = s.Method == Method.Manual ? "Hesaplanıyor…" : "En uygun ayar aranıyor…";
+        if (!saving) Get<TextBlock>("Result").Text = s.Method == Method.Manual ? Lang.T("Hesaplanıyor…") : Lang.T("En uygun ayar aranıyor…");
         Images.Background(() =>
         {
             BitmapSource look = null;
@@ -1179,8 +1227,8 @@ class Editor
                 report.Kind = Images.Kind(ext);
                 if (s.Method == Method.Target && before <= s.TargetKb * 1024L)
                 {
-                    report.Summary = "Kaydedilmeyecek";
-                    report.Note = "Bu görsel zaten " + s.TargetKb + " KB altında.";
+                    report.Summary = Lang.T("Kaydedilmeyecek");
+                    report.Note = Lang.T("Bu görsel zaten ") + s.TargetKb + Lang.T(" KB altında.");
                 }
                 else
                 {
@@ -1192,19 +1240,19 @@ class Editor
                     report.Summary = Images.Difference(before, after);
                     report.Trend = after.CompareTo(before);
                     string skip = mode == Mode.Preset ? Presets.Skip(s.Preset, path, current, ext, found) : null;
-                    if (mode == Mode.Compress && after >= before) report.Note = "Küçülmediği için kaydedilmeyecek.";
-                    else if (skip != null) report.Note = skip + " Kaydedilmeyecek.";
+                    if (mode == Mode.Compress && after >= before) report.Note = Lang.T("Küçülmediği için kaydedilmeyecek.");
+                    else if (skip != null) report.Note = skip + Lang.T(" Kaydedilmeyecek.");
                     else if (current.Transparent && (ext == ".jpg" || ext == ".jpeg" || ext == ".bmp"))
-                        report.Note = "Saydam alanlar beyaz olacak.";
-                    else if (found.Resized) report.Note = "Hedefe sığması için görsel de küçültüldü.";
-                    else if (mode == Mode.Crop && s.Shape != CropShape.Rectangle) report.Note = "Şeklin dışı saydam olur.";
+                        report.Note = Lang.T("Saydam alanlar beyaz olacak.");
+                    else if (found.Resized) report.Note = Lang.T("Hedefe sığması için görsel de küçültüldü.");
+                    else if (mode == Mode.Crop && s.Shape != CropShape.Rectangle) report.Note = Lang.T("Şeklin dışı saydam olur.");
                     if (mode != Mode.Crop) look = Images.Decode(found.Data, ext);
                 }
             }
             catch (Exception e)
             {
                 Log.Error("önizleme: " + path, e);
-                report.Summary = "Önizleme hazırlanamadı";
+                report.Summary = Lang.T("Önizleme hazırlanamadı");
                 report.Note = e.Message;
             }
             Window.Dispatcher.BeginInvoke((Action)(() =>
@@ -1244,7 +1292,7 @@ class Editor
         if (totalBusy) DropTotal(""); // the processor belongs to saving now
         var button = Get<Button>("Save");
         button.IsEnabled = false;
-        button.Content = "Kaydediliyor…";
+        button.Content = Lang.T("Kaydediliyor…");
         var s = Read();
         var shown = picture;
         string shownPath = paths[index];
@@ -1257,7 +1305,7 @@ class Editor
             string ext = ExtensionFor(s, path, p);
             bool searched = s.Method != Method.Manual;
             if (s.Method == Method.Target && new FileInfo(path).Length <= s.TargetKb * 1024L)
-                return new Outcome { Text = "Dosya zaten " + s.TargetKb + " KB altında." };
+                return new Outcome { Text = Lang.T("Dosya zaten ") + s.TargetKb + Lang.T(" KB altında.") };
             if (mode == Mode.Preset)
             {
                 var made = Make(s, p, ext);
@@ -1280,7 +1328,7 @@ class Editor
             try
             {
                 outcome = !Many ? job(paths[0], 0) : Images.Batch(paths, job,
-                    i => Window.Dispatcher.BeginInvoke((Action)(() => button.Content = "Kaydediliyor " + (i + 1) + "/" + paths.Length + "…")),
+                    i => Window.Dispatcher.BeginInvoke((Action)(() => button.Content = Lang.T("Kaydediliyor ") + (i + 1) + "/" + paths.Length + "…")),
                     () => stopped = closed);
                 if (bundle != null)
                 {
@@ -1293,13 +1341,13 @@ class Editor
             {
                 Log.Error("kaydetme: " + shownPath, e);
                 outcome = null;
-                failure = "Kaydedilemedi: " + e.Message;
+                failure = Lang.T("Kaydedilemedi: ") + e.Message;
             }
             finally { if (bundle != null) bundle.Dispose(); }
             Window.Dispatcher.BeginInvoke((Action)(() =>
             {
                 saving = false;
-                button.Content = "Kaydet";
+                button.Content = Lang.T("Kaydet");
                 if (outcome != null && outcome.File != null)
                 {
                     Images.Notify(outcome);

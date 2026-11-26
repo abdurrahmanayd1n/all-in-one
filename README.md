@@ -2,7 +2,7 @@
 
 Windows için İsviçre çakısı: Dosya Gezgini'nde ya da masaüstünde dosya seç, **Sol Alt** tuşunu basılı tut, imlecin yanında radyal menü açılsın. Yanında ekran **renk seçici** ve birkaç küçük araç gelir. Her şey bilgisayarında çalışır; internete bağlanmaz.
 
-*A radial menu for files selected in Explorer (hold Left Alt), plus a screen colour picker and small Windows tools. The interface is in Turkish.*
+*A radial menu for files selected in Explorer (hold Left Alt), a file preview (Alt+Space), screenshots and screen recording (Alt+S), a colour picker and small Windows tools. The interface is in Turkish and English.*
 
 ## İndir ve çalıştır
 
@@ -36,10 +36,17 @@ Kaldırmak için, klasörde:
 
 ### İsteğe bağlı
 
-- **FFmpeg**: video araçları ve WebP için gerekir. Yoksa bu seçenekler görünmez.
+- **FFmpeg**: video araçları, ekran kaydı ve WebP için gerekir. Yoksa bu seçenekler görünmez.
 
   ```powershell
   winget install Gyan.FFmpeg
+  ```
+
+  Sonra uygulamayı kapatıp yeniden aç.
+- **qpdf**: PDF birleştirme ve sayfa ayırma için gerekir. Yoksa bu seçenekler görünmez.
+
+  ```powershell
+  winget install QPDF.QPDF
   ```
 
   Sonra uygulamayı kapatıp yeniden aç.
@@ -52,11 +59,25 @@ Dosyayı seç, Sol Alt'ı basılı tut, istediğin dilimin üzerinde tuşu bıra
 | Seçtiğin | Yapabildiklerin |
 | --- | --- |
 | Görsel | Format değiştir (JPG, PNG, WebP, BMP, TIFF, GIF), ölçeklendir, kırp, sıkıştır (akıllı kalite veya hedef boyut, önce/sonra karşılaştırma), metni al, hazır ayar |
-| Video | Sıkıştır, GIF yap, sesi ayır (MP3, M4A, WAV) |
-| Klasör | Boyut dökümü, ZIP yap, içindekileri toplu adlandır |
-| Her dosya | Yolu kopyala, terminal aç, toplu yeniden adlandır (geri alınabilir), "Kim kullanıyor?" |
+| Video | Sıkıştır, kes (hızlı ve kayıpsız ya da kare hassasiyetli), birkaç videoyu birleştir, GIF yap, sesi ayır (MP3, M4A, WAV) |
+| PDF | Sırasını seçip birleştir, seçtiğin sayfaları ya da her sayfayı ayrı dosya yap |
+| Klasör | Boyut dökümü, ZIP yap, içindekileri toplu adlandır, türe veya aya göre alt klasörlere ayır (geri alınabilir), aynı içerikli kopyaları bulup Geri Dönüşüm Kutusu'na at |
+| Her dosya | Yolu kopyala, terminal aç, toplu yeniden adlandır (geri alınabilir), "Kim kullanıyor?", doğrulama kodu (SHA-256, SHA-1, MD5) göster ve karşılaştır |
 
 Görsel ve video işlemleri yeni dosya yazar; asıl dosyanın üzerine yazılmaz. Birden çok dosya seçersen işlem hepsine uygulanır.
+
+## Dosya önizleme
+
+Dosya seç, **Alt+Space** bas: Dosya Gezgini görünümünde bir pencere açılır. Görsel, metin, PDF, Word belgesi, ZIP listesi, video ve ses içeriği görünür; klasör ve diğer dosyalar simgesiyle gösterilir. Hiçbir şey değiştirilmez. `Esc` ya da `Boşluk` kapatır, `← →` seçili diğer dosyaya geçer. Seçili dosya yoksa Alt+Space başka programlara kalır. Ayarlar'dan kapatılabilir.
+
+## Ekran görüntüsü ve kaydı
+
+**Alt+S**, üstteki çubuktan türü seç, sonra alanı sürükle (`Tab` türler arasında geçer, `Enter` tüm ekranı alır):
+
+- **Görüntü**: panoya kopyalanır ve `Resimler\All In One` klasörüne kaydedilir.
+- **Video**: `Videolar\All In One` klasörüne kaydedilir; bilgisayar sesi ve mikrofon ayrı ayrı açılıp kapanır. Bitirmek için `Durdur` ya da yine Alt+S.
+- **Sabitle**: seçtiğin parça üstte duran küçük bir pencere olur. Sürükle, tekerlekle büyüt ya da küçült, çift tıkla veya `Esc` ile kapat; sağ tıkta kopyala ve kaydet.
+- **Kayan**: yalnız kayan kısmı seç; uygulama sayfayı fare tekerleğiyle kaydırıp tek uzun görüntü yapar. `Bitir`, `Esc` ya da Alt+S durdurur. Kendiliğinden hareket eden içerikte (video, canlandırma) birleştirme yarıda kalabilir.
 
 ## Renk seçici
 
@@ -69,13 +90,15 @@ Saatin yanındaki ayrı simge:
 
 | Kısayol | İşlev |
 | --- | --- |
+| `Alt+S` | Ekran görüntüsü ya da ekran kaydı |
+| `Alt+Space` | Seçili dosyayı önizle |
 | `Alt+Q` veya `Win+Shift+O` | Ekranda alan seç, içindeki metni kopyala |
-| `Alt+T` | Ekrandaki tabloyu seç, sütunlarıyla kopyala (Excel'e yapıştır) |
+| `Alt+T` | Ekrandaki tabloyu seç; düzeltip kopyala (Excel'e yapıştır) ya da CSV kaydet |
 | `Win+Shift+U` | Pencereyi üstte sabitle / bırak |
 | `Win+Shift+Y` | Düz (biçimsiz) yapıştır |
 | `Win+Shift+B` | Büyük/küçük harf çevirip yapıştır |
 
-Menünün açılma süresi, otomatik başlatma ve dosya adlarına eklenecek sabit ek, saatin yanındaki All In One simgesinden **Ayarlar** ile değişir.
+Menünün açılma süresi, kısayol tuşları, arayüz dili (Türkçe / İngilizce), otomatik başlatma ve dosya adlarına eklenecek sabit ek, saatin yanındaki All In One simgesinden **Ayarlar** ile değişir. Bir kısayol başka bir programdakiyle çakışırsa (ör. Outlook'ta Alt+S gönder demektir) buradan değiştir.
 
 ## Code signing policy
 
@@ -84,7 +107,7 @@ Releases are **not signed yet**. This project intends to apply to the SignPath F
 - Committers, reviewers and approvers: [abdurrahmanayd1n](https://github.com/abdurrahmanayd1n)
 - Release binaries are built only from this repository by [GitHub Actions](.github/workflows/surum.yml), from a version tag.
 - Privacy policy: This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. See [Gizlilik](#gizlilik).
-- Optional third-party program: [FFmpeg](https://ffmpeg.org), installed by the user and run locally.
+- Optional third-party programs: [FFmpeg](https://ffmpeg.org) and [qpdf](https://qpdf.sourceforge.io), installed by the user and run locally.
 
 ## Gizlilik
 

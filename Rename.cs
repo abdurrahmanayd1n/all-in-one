@@ -87,8 +87,8 @@ static class Renamer
             StringComparer.OrdinalIgnoreCase);
         foreach (var item in plan.Where(p => p.Problem == null))
         {
-            if (wanted[item.To] > 1) item.Problem = "Aynı ad birden fazla dosyaya veriliyor.";
-            else if (item.Changes && !leaving.Contains(item.To) && taken(item.To)) item.Problem = "Bu adda bir dosya zaten var.";
+            if (wanted[item.To] > 1) item.Problem = Lang.T("Aynı ad birden fazla dosyaya veriliyor.");
+            else if (item.Changes && !leaving.Contains(item.To) && taken(item.To)) item.Problem = Lang.T("Bu adda bir dosya zaten var.");
         }
         return plan;
     }
@@ -121,8 +121,8 @@ static class Renamer
                 try { File.Move(done[i].Item2, done[i].Item1); }
                 catch (Exception) { stuck.Add(done[i].Item2); }
             }
-            throw new IOException("Yeniden adlandırılamadı: " + e.Message + (stuck.Count == 0 ? "\nHiçbir dosya değişmedi."
-                : "\nGeri alınamayan dosyalar: " + string.Join(", ", stuck)), e);
+            throw new IOException(Lang.T("Yeniden adlandırılamadı: ") + e.Message + (stuck.Count == 0 ? Lang.T("\nHiçbir dosya değişmedi.")
+                : Lang.T("\nGeri alınamayan dosyalar: ") + string.Join(", ", stuck)), e);
         }
     }
 
@@ -147,8 +147,8 @@ class RenameWindow
     {
         files = chosen;
         Assets.Dress(Window);
-        Window.Title = "Yeniden Adlandır - " + files.Length + " dosya";
-        Get<TextBlock>("Heading").Text = "Yeniden Adlandır";
+        Window.Title = Lang.T("Yeniden Adlandır - ") + files.Length + Lang.T(" dosya");
+        Get<TextBlock>("Heading").Text = Lang.T("Yeniden Adlandır");
         Get<ScrollViewer>("Settings").Visibility = Visibility.Collapsed;
         Get<ScrollViewer>("Renaming").Visibility = Visibility.Visible;
         Get<TextBlock>("Loading").Visibility = Visibility.Collapsed;
@@ -156,7 +156,7 @@ class RenameWindow
         Get<ScrollViewer>("RenameList").Visibility = Visibility.Visible;
 
         var pattern = Get<TextBox>("PatternBox");
-        foreach (var token in new[] { Tuple.Create("{ad}", "Eski ad"), Tuple.Create("{n}", "Numara"), Tuple.Create("{tarih}", "Tarih") })
+        foreach (var token in new[] { Tuple.Create("{ad}", Lang.T("Eski ad")), Tuple.Create("{n}", Lang.T("Numara")), Tuple.Create("{tarih}", Lang.T("Tarih")) })
         {
             string value = token.Item1;
             var button = new Button { Content = "+ " + token.Item2, Padding = new Thickness(10, 5, 10, 5), Margin = new Thickness(0, 0, 6, 0),
@@ -173,19 +173,19 @@ class RenameWindow
         pattern.SelectionStart = pattern.Text.Length;
         foreach (string name in new[] { "PatternBox", "FindBox", "ReplaceBox", "StartBox", "DigitsBox" })
             Get<TextBox>(name).TextChanged += (s, e) => Preview();
-        Chip("CaseChips", "case", "Aynı", true, () => letters = LetterCase.Keep);
-        Chip("CaseChips", "case", "küçük", false, () => letters = LetterCase.Lower);
-        Chip("CaseChips", "case", "BÜYÜK", false, () => letters = LetterCase.Upper);
-        Chip("OrderChips", "order", "Ada göre", true, () => byDate = false);
-        Chip("OrderChips", "order", "Tarihe göre", false, () => byDate = true);
+        Chip("CaseChips", "case", Lang.T("Aynı"), true, () => letters = LetterCase.Keep);
+        Chip("CaseChips", "case", Lang.T("küçük"), false, () => letters = LetterCase.Lower);
+        Chip("CaseChips", "case", Lang.T("BÜYÜK"), false, () => letters = LetterCase.Upper);
+        Chip("OrderChips", "order", Lang.T("Ada göre"), true, () => byDate = false);
+        Chip("OrderChips", "order", Lang.T("Tarihe göre"), false, () => byDate = true);
 
         var apply = Get<Button>("Save");
-        apply.Content = "Adlandır";
+        apply.Content = Lang.T("Adlandır");
         apply.Click += (s, e) => Rename();
         var undo = Get<Button>("Extra");
-        undo.Content = "Geri al";
+        undo.Content = Lang.T("Geri al");
         undo.Click += (s, e) => Undo();
-        Get<Button>("Cancel").Content = "Kapat";
+        Get<Button>("Cancel").Content = Lang.T("Kapat");
         Get<Button>("Cancel").Click += (s, e) => Window.Close();
         Preview();
     }
@@ -229,9 +229,9 @@ class RenameWindow
         }
         int changes = plan.Count(p => p.Problem == null && p.Changes), problems = plan.Count(p => p.Problem != null);
         List();
-        Get<TextBlock>("Details").Text = files.Length + " dosya · " + changes + " tanesinin adı değişecek";
+        Get<TextBlock>("Details").Text = files.Length + Lang.T(" dosya · ") + changes + Lang.T(" tanesinin adı değişecek");
         var first = plan.FirstOrDefault(p => p.Problem != null);
-        Say(first == null ? null : problems + " dosyada sorun var: " + first.Problem, true);
+        Say(first == null ? null : problems + Lang.T(" dosyada sorun var: ") + first.Problem, true);
         Get<Button>("Save").IsEnabled = problems == 0 && changes > 0;
     }
 
@@ -252,7 +252,7 @@ class RenameWindow
                 item.Problem != null ? "#FF8A80" : item.Changes ? "#F2F3F5" : "#6B6E79"));
             rows.Children.Add(row);
         }
-        if (plan.Count > Shown) rows.Children.Add(Cell("… ve " + (plan.Count - Shown) + " dosya daha", 0, "#A6A9B4"));
+        if (plan.Count > Shown) rows.Children.Add(Cell(Lang.T("… ve ") + (plan.Count - Shown) + Lang.T(" dosya daha"), 0, "#A6A9B4"));
     }
 
     static TextBlock Cell(string text, int column, string color)
@@ -289,10 +289,10 @@ class RenameWindow
         var renamed = changes.ToDictionary(c => c.From, c => c.To);
         files = files.Select(f => renamed.ContainsKey(f) ? renamed[f] : f).ToArray();
         // Applying the same pattern again to the new names is rarely meant: wait for a change.
-        Done(changes, changes.Count + " dosya yeniden adlandırıldı.");
+        Done(changes, changes.Count + Lang.T(" dosya yeniden adlandırıldı."));
         Get<Button>("Extra").Visibility = Visibility.Visible;
         Get<Button>("Extra").IsEnabled = true;
-        Images.Notify(new Outcome { File = changes[0].To, Text = changes.Count + " dosya yeniden adlandırıldı" });
+        Images.Notify(new Outcome { File = changes[0].To, Text = changes.Count + Lang.T(" dosya yeniden adlandırıldı") });
     }
 
     void Undo()
@@ -308,7 +308,7 @@ class RenameWindow
         last = null;
         var renamed = back.ToDictionary(c => c.From, c => c.To);
         files = files.Select(f => renamed.ContainsKey(f) ? renamed[f] : f).ToArray();
-        Done(back, "Eski adlar geri getirildi.");
+        Done(back, Lang.T("Eski adlar geri getirildi."));
         Get<Button>("Extra").IsEnabled = false;
     }
 
@@ -316,7 +316,7 @@ class RenameWindow
     {
         plan = moved;
         List();
-        Get<TextBlock>("Details").Text = files.Length + " dosya";
+        Get<TextBlock>("Details").Text = files.Length + Lang.T(" dosya");
         Say(message, false);
         Get<Button>("Save").IsEnabled = false;
     }

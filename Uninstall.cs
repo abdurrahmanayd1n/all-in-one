@@ -29,8 +29,8 @@ static class Uninstall
     // From the settings window.
     public static void Ask()
     {
-        var answer = MessageBox.Show("Ayarlar, hazır ayarlar, renk geçmişi, hata kaydı, bildirim kaydı ve otomatik başlatma"
-            + " silinecek, uygulama kapanacak. Dosyaların silinmez.\n\nKaldırılsın mı?", "All In One - kaldır",
+        var answer = MessageBox.Show(Lang.T("Ayarlar, hazır ayarlar, renk geçmişi, hata kaydı, bildirim kaydı ve otomatik başlatma")
+            + Lang.T(" silinecek, uygulama kapanacak. Dosyaların silinmez.\n\nKaldırılsın mı?"), Lang.T("All In One - kaldır"),
             MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;
         try { Remove(Toast.IdentityKey); }
@@ -38,11 +38,11 @@ static class Uninstall
         {
             Log.Off = false;
             Log.Error("kaldırma", e);
-            MessageBox.Show("Tamamı kaldırılamadı: " + e.Message, "All In One");
+            MessageBox.Show(Lang.T("Tamamı kaldırılamadı: ") + e.Message, "All In One");
             return;
         }
         string exe = System.Windows.Forms.Application.ExecutablePath;
-        MessageBox.Show("Kaldırıldı. Son adım: açılan klasörde seçili duran dosyayı sil.\n\n" + exe, "All In One");
+        MessageBox.Show(Lang.T("Kaldırıldı. Son adım: açılan klasörde seçili duran dosyayı sil.\n\n") + exe, "All In One");
         System.Diagnostics.Process.Start(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
             "explorer.exe"), "/select,\"" + exe + "\"");
         Quit();

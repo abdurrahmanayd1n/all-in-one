@@ -154,7 +154,7 @@ class RadialMenu : Window
     {
         int mine = ++token;
         backdrop = Blurred(new Drawing.Point(0, 0), (int)(Side * scale));
-        items = new[] { new Item { Label = " ", Icon = "", Children = new[] { new Item { Label = " " } } } };
+        items = new[] { new Item { Label = " ", Icon = "\uE8AB", Children = new[] { new Item { Label = " " } } } };
         title = detail = " ";
         Build();
         hover = 0;
