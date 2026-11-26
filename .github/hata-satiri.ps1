@@ -4,7 +4,7 @@ $sp = Join-Path $env:TEMP 'allinone-hata-satiri'
 $probe = "$sp\probe"
 New-Item -ItemType Directory -Force $probe | Out-Null
 Get-ChildItem -Filter *.cs | Copy-Item -Destination $probe -Force
-Copy-Item .\Editor.xaml, .\app.ico $probe -Force
+Copy-Item .\Editor.xaml, .\Preview.xaml, .\app.ico $probe -Force
 $lines = [IO.File]::ReadAllText((Resolve-Path .\AllInOne.cs).Path).Replace("`r`n", "`n") -split "`n"
 $out = New-Object System.Collections.Generic.List[string]
 $seen = $false; $last = ''
@@ -21,7 +21,7 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
 $fw = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"; $meta = "$env:WINDIR\System32\WinMetadata"
 Push-Location $probe
 Remove-Item probe.exe -ErrorAction SilentlyContinue
-& "$fw\csc.exe" /nologo /codepage:65001 /target:winexe "/out:$probe\probe.exe" "/lib:$fw\WPF" /r:WindowsBase.dll /r:Microsoft.CSharp.dll /r:System.IO.Compression.dll /r:PresentationCore.dll /r:PresentationFramework.dll /r:System.Xaml.dll /r:WindowsFormsIntegration.dll "/resource:app.ico,app.ico" "/resource:Editor.xaml,Editor.xaml" "/r:$meta\Windows.UI.winmd" "/r:$meta\Windows.Data.winmd" "/r:$meta\Windows.Foundation.winmd" "/r:$meta\Windows.Media.winmd" "/r:$meta\Windows.Graphics.winmd" "/r:$meta\Windows.Globalization.winmd" "/r:$meta\Windows.Storage.winmd" "/r:$meta\Windows.Security.winmd" "/r:$fw\System.Runtime.dll" "/r:$fw\System.Runtime.WindowsRuntime.dll" "/r:$fw\System.Runtime.InteropServices.WindowsRuntime.dll" (Get-ChildItem -Filter *.cs).FullName
+& "$fw\csc.exe" /nologo /codepage:65001 /target:winexe "/out:$probe\probe.exe" "/lib:$fw\WPF" /r:WindowsBase.dll /r:Microsoft.CSharp.dll /r:System.IO.Compression.dll /r:PresentationCore.dll /r:PresentationFramework.dll /r:System.Xaml.dll /r:WindowsFormsIntegration.dll "/resource:app.ico,app.ico" "/resource:Editor.xaml,Editor.xaml" "/resource:Preview.xaml,Preview.xaml" /r:System.Xml.dll "/r:$meta\Windows.UI.winmd" "/r:$meta\Windows.Data.winmd" "/r:$meta\Windows.Foundation.winmd" "/r:$meta\Windows.Media.winmd" "/r:$meta\Windows.Graphics.winmd" "/r:$meta\Windows.Globalization.winmd" "/r:$meta\Windows.Storage.winmd" "/r:$meta\Windows.Security.winmd" "/r:$fw\System.Runtime.dll" "/r:$fw\System.Runtime.WindowsRuntime.dll" "/r:$fw\System.Runtime.InteropServices.WindowsRuntime.dll" (Get-ChildItem -Filter *.cs).FullName
 Pop-Location
 if (Test-Path "$probe\probe.exe") {
     $p = Start-Process "$probe\probe.exe" '--test' -Wait -PassThru; "cikis kodu: $($p.ExitCode)"

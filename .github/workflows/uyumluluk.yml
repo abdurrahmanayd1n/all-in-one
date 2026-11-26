@@ -17,6 +17,10 @@ jobs:
       - name: Derle ve oz test
         shell: powershell
         run: .\kur.ps1 -Derle
+      - name: Yeni araclarin basarisiz kontrolleri
+        if: failure()
+        shell: powershell
+        run: Get-Content "$env:TEMP\AllInOne-test.txt" -Encoding UTF8 -ErrorAction SilentlyContinue
       - name: Basarisiz kontrolun satirini bul
         if: failure()
         shell: powershell

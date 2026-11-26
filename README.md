@@ -113,6 +113,7 @@ Releases are **not signed yet**. This project intends to apply to the SignPath F
 
 - Uygulama ağ bağlantısı açmaz; hiçbir bilgi başka bir sisteme gönderilmez.
 - Sol Alt'ı fark edebilmek için bir klavye kancası kullanır; bastığın tuşları kaydetmez. Bazı güvenlik yazılımları klavye kancalarından uyarı verebilir.
+- Mikrofon yalnız ekran kaydında ve sen açarsan alınır. Ekran görüntüleri ve kayıtlar yalnız senin Resimler ve Videolar klasörlerine yazılır.
 - Ayarlar ve renk geçmişi `HKCU\Software\AllInOne` altında, hata kaydı `%LOCALAPPDATA%\AllInOne\hata.log` dosyasındadır. Hata kaydında dosya yolları geçebilir; birine göndermeden önce bak.
 - Sistemde değiştirdikleri, hepsi yalnız senin kullanıcı hesabında: yukarıdaki iki yer, bildirimlerin adı ve simgesi (`HKCU\Software\Classes\AppUserModelId\AllInOne.App`, `%LOCALAPPDATA%\AllInOne\app.ico`) ve sen açarsan otomatik başlatma kaydı. **Uygulamayı kaldır** hepsini siler.
 
