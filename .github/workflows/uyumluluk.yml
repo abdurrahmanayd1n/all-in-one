@@ -17,14 +17,15 @@ jobs:
       - name: Derle ve oz test
         shell: powershell
         run: .\kur.ps1 -Derle
-      - name: Yeni araclarin basarisiz kontrolleri
+      # Shown as an annotation on the run's page, which can be read without signing in.
+      - name: Basarisiz kontrolu bul
         if: failure()
         shell: powershell
-        run: Get-Content "$env:TEMP\AllInOne-test.txt" -Encoding UTF8 -ErrorAction SilentlyContinue
-      - name: Basarisiz kontrolun satirini bul
-        if: failure()
-        shell: powershell
-        run: .\.github\hata-satiri.ps1
+        run: |
+          $found = @(Get-Content "$env:TEMP\AllInOne-test.txt" -Encoding UTF8 -ErrorAction SilentlyContinue)
+          $found += @(.\.github\hata-satiri.ps1 | ForEach-Object { "$_" })
+          $found
+          "::error::" + (($found | Select-Object -First 60) -join '%0A')
       - name: Uygulamayi ac, ayakta kaldigini ve hata yazmadigini dogrula
         shell: powershell
         run: |
